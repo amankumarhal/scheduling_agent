@@ -54,8 +54,8 @@ flowchart TD
 3. The latest user text is classified by `classify_intent()`.
 4. Emergency rules run before normal scheduling.
 5. If safe, the orchestrator builds a bounded prompt with system policy, latest intent, compact state, and recent conversation.
-6. The OpenAI client calls the configured chat model with strict tool schemas.
-7. If the model asks for a tool, the orchestrator validates and dispatches it.
+6. The OpenAI client streams the configured chat model with strict tool schemas.
+7. If the model asks for a tool, the orchestrator assembles the streamed tool call, validates it, and dispatches it.
 8. The deterministic tool reads or mutates the appointment store.
 9. Tool output is returned to the model so the model can produce a user-facing answer.
 10. The final response is normalized for voice and logged.
@@ -394,6 +394,7 @@ Lookup responses include provider, specialty, location, time, patient name, reas
 Several request-path latency improvements are in place:
 
 - `/chat/stream` no longer adds artificial word delay.
+- The LLM client can stream text deltas and assembled tool calls.
 - LLM history is bounded to recent conversation.
 - Session logs write in the background.
 - JSON appointment-store writes are coalesced in the background.
@@ -404,7 +405,6 @@ Several request-path latency improvements are in place:
 
 The largest remaining latency improvements are:
 
-- True token streaming from the LLM.
 - Sentence-level TTS pipelining, where speech begins after the first complete generated sentence.
 - A real-time voice transport layer instead of file upload.
 

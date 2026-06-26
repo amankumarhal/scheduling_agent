@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from pydantic import ValidationError
 
@@ -56,12 +57,18 @@ def is_emergency_clarification(text: str) -> bool:
         "alright",
         "i am fine",
         "i'm fine",
+        "i am good",
+        "i'm good",
+        "good right now",
         "just kidding",
         "was kidding",
         "minimal pain",
         "minor pain",
         "not severe",
         "not that much",
+        "not that bad",
+        "not too bad",
+        "not bad",
     ]
     negated_urgent_pattern = (
         r"\b("
@@ -242,7 +249,10 @@ class AppointmentOrchestrator:
             state.emergency_active = True
             self.session_logger.log(session_id, "user", {"message": message})
             return self._record_assistant_response(state, EMERGENCY_RESPONSE)
-        if state.emergency_active and is_emergency_clarification(message):
+        if state.emergency_active and (
+            is_emergency_clarification(message)
+            or intent.intent in {"book", "reschedule", "cancel", "confirm_lookup"}
+        ):
             state.emergency_active = False
 
         if is_non_emergency_symptom_context(message):
@@ -287,6 +297,103 @@ class AppointmentOrchestrator:
         state.messages.append({"role": "assistant", "content": fallback})
         self.session_logger.log(session_id, "assistant", {"message": fallback})
         return self._agent_response(state, fallback, local_tool_calls)
+
+    async def handle_message_stream(
+        self, message: str, session_id: str = "default"
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Stream one user turn through safety checks, LLM deltas, tools, and final response."""
+        state = self.get_state(session_id)
+        intent = classify_intent(message)
+        state.last_intent = intent
+        emergency_detected = intent.intent == "emergency" or is_emergency(message)
+
+        if state.emergency_active and not is_emergency_clarification(message):
+            self.session_logger.log(session_id, "user", {"message": message})
+            content = normalize_for_voice(EMERGENCY_RESPONSE)
+            state.messages.append({"role": "assistant", "content": content})
+            self.session_logger.log(session_id, "assistant", {"message": content})
+            yield {"type": "delta", "text": content}
+            yield {"type": "done", "response": self._agent_response(state, content, [])}
+            return
+
+        if emergency_detected and not is_emergency_clarification(message):
+            state.emergency_active = True
+            self.session_logger.log(session_id, "user", {"message": message})
+            content = normalize_for_voice(EMERGENCY_RESPONSE)
+            state.messages.append({"role": "assistant", "content": content})
+            self.session_logger.log(session_id, "assistant", {"message": content})
+            yield {"type": "delta", "text": content}
+            yield {"type": "done", "response": self._agent_response(state, content, [])}
+            return
+
+        if state.emergency_active and (
+            is_emergency_clarification(message)
+            or intent.intent in {"book", "reschedule", "cancel", "confirm_lookup"}
+        ):
+            state.emergency_active = False
+
+        if is_non_emergency_symptom_context(message):
+            self.session_logger.log(session_id, "user", {"message": message})
+            safe_response = (
+                "I'm sorry you're dealing with that. I can help schedule an appointment. "
+                "Would you like to look for primary care, or another specialty?"
+            )
+            content = normalize_for_voice(safe_response)
+            state.messages.append({"role": "assistant", "content": content})
+            self.session_logger.log(session_id, "assistant", {"message": content})
+            yield {"type": "delta", "text": content}
+            yield {"type": "done", "response": self._agent_response(state, content, [])}
+            return
+
+        state.messages.append({"role": "user", "content": message})
+        self.session_logger.log(
+            session_id,
+            "user",
+            {"message": message, "intent": intent.model_dump(mode="json")},
+        )
+        llm_messages = self._llm_messages(state, intent)
+
+        local_tool_calls: list[ToolCallRecord] = []
+        for _ in range(5):
+            accumulated_content = ""
+            received_tool_calls: list[dict[str, Any]] | None = None
+
+            async for event in self.openai_client.stream_llm(llm_messages, tools=OPENAI_TOOLS, tool_choice="auto"):
+                if event["type"] == "content":
+                    accumulated_content += event["text"]
+                    yield {"type": "delta", "text": event["text"]}
+                elif event["type"] == "tool_calls":
+                    received_tool_calls = event["tool_calls"]
+
+            if received_tool_calls is None:
+                content = normalize_for_voice(accumulated_content)
+                state.messages.append({"role": "assistant", "content": content})
+                self.session_logger.log(session_id, "assistant", {"message": content})
+                yield {"type": "done", "response": self._agent_response(state, content, local_tool_calls)}
+                return
+
+            assistant_history: dict[str, Any] = {
+                "role": "assistant",
+                "content": accumulated_content or None,
+                "tool_calls": received_tool_calls,
+            }
+            llm_messages.append(assistant_history)
+            state.messages.append(assistant_history)
+
+            for tool_call in received_tool_calls:
+                record, tool_message = self._execute_tool_call(tool_call, state)
+                local_tool_calls.append(record)
+                state.tool_calls.append(record)
+                llm_messages.append(tool_message)
+                state.messages.append(tool_message)
+
+        fallback = normalize_for_voice(
+            "I'm sorry, I hit a tool loop while working on that. Could you restate what you want to do next?"
+        )
+        state.messages.append({"role": "assistant", "content": fallback})
+        self.session_logger.log(session_id, "assistant", {"message": fallback})
+        yield {"type": "delta", "text": fallback}
+        yield {"type": "done", "response": self._agent_response(state, fallback, local_tool_calls)}
 
     def _execute_tool_call(self, tool_call: Any, state: ConversationState) -> tuple[ToolCallRecord, dict[str, Any]]:
         """Validate and execute one model-requested tool call, then create a tool message."""

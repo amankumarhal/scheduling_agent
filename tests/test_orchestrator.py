@@ -152,6 +152,21 @@ def test_just_kidding_clarification_resumes_scheduling() -> None:
     assert mock.calls == 1
 
 
+def test_accident_clarification_with_not_that_bad_resumes_scheduling() -> None:
+    mock = MockOpenAIClient([assistant_response("I can help book that. What specialty would you like?")])
+    agent = AppointmentOrchestrator(openai_client=mock)
+    first = agent.handle_message("I just met with an accident.", session_id="accident-clarify")
+    second = agent.handle_message(
+        "But it was not that bad, so I am good right now. Can we book an appointment?",
+        session_id="accident-clarify",
+    )
+
+    assert first.message == EMERGENCY_RESPONSE
+    assert second.message == "I can help book that. What specialty would you like?"
+    assert second.state_summary["emergency_active"] is False
+    assert mock.calls == 1
+
+
 def test_non_emergency_injury_context_does_not_get_medical_advice() -> None:
     mock = MockOpenAIClient([assistant_response("This should not be called.")])
     agent = AppointmentOrchestrator(openai_client=mock)

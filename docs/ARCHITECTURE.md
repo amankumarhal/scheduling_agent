@@ -214,9 +214,9 @@ Session logs are separate from the operational booking store. Bookings are retri
 
 ## Streaming Design
 
-The browser uses `POST /chat/stream` to render assistant text progressively. The current implementation streams the final assistant message after deterministic tool execution finishes. This gives the user a smoother ChatGPT-like experience while preserving the safety boundary around tool calls.
+The browser uses `POST /chat/stream` to render assistant text progressively. The orchestrator can stream LLM text deltas, assemble streamed tool calls, execute deterministic tools, and then continue the response loop while preserving the safety boundary around tool calls.
 
-A production version could add true token streaming from the LLM and handle tool-call phases explicitly:
+A production version could further optimize tool-call phases:
 
 1. Stream initial assistant reasoning or acknowledgement.
 2. Pause for tool execution.
@@ -224,7 +224,7 @@ A production version could add true token streaming from the LLM and handle tool
 
 The current design is simpler and easier to explain in a technical walkthrough.
 
-The endpoint no longer adds an artificial word-by-word delay after the response is complete. The larger remaining latency improvement is a tool-aware LLM streaming loop that can stream natural-language tokens before and after tool execution.
+The endpoint no longer adds an artificial word-by-word delay after the response is complete. The larger remaining latency improvement is sentence-level TTS pipelining from generated text into speech.
 
 ## Urgency Handling
 

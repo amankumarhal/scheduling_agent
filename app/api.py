@@ -692,12 +692,14 @@ def chat(request: ChatRequest) -> dict:
 
 @app.post("/chat/stream")
 async def chat_stream(request: ChatRequest) -> StreamingResponse:
-    """Return an SSE response for browser chat rendering."""
+    """Stream assistant response events to the browser."""
     async def event_stream():
-        """Emit the completed assistant message as SSE delta and final events."""
-        response = await asyncio.to_thread(agent.handle_message, request.message, request.session_id)
-        yield f"event: delta\ndata: {json.dumps({'text': response.message})}\n\n"
-        yield f"event: final\ndata: {response.model_dump_json()}\n\n"
+        """Forward orchestrator stream events as server-sent events."""
+        async for event in agent.handle_message_stream(request.message, session_id=request.session_id):
+            if event["type"] == "delta":
+                yield f"event: delta\ndata: {json.dumps({'text': event['text']})}\n\n"
+            elif event["type"] == "done":
+                yield f"event: final\ndata: {event['response'].model_dump_json()}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
