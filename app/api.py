@@ -3,13 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from fastapi import FastAPI, File, Form, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
 from app.orchestrator import AppointmentOrchestrator
 from app.stt_client import transcribe_audio
-from app.tts_client import synthesize_speech
+from app.tts_client import synthesize_speech, synthesize_speech_bytes
 
 app = FastAPI(title="Appointment Scheduling AI Agent")
 agent = AppointmentOrchestrator()
@@ -18,6 +18,10 @@ agent = AppointmentOrchestrator()
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
+
+
+class SpeakRequest(BaseModel):
+    text: str
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -30,51 +34,446 @@ def home() -> str:
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Appointment Scheduling AI Agent</title>
         <style>
+          :root {
+            color-scheme: light;
+            --bg: #f7f8fb;
+            --panel: #ffffff;
+            --ink: #172033;
+            --muted: #667085;
+            --line: #d9e0ea;
+            --accent: #0f766e;
+            --accent-strong: #115e59;
+            --danger: #b42318;
+            --user: #e7f5f2;
+            --assistant: #f2f4f7;
+          }
+          * { box-sizing: border-box; }
           body {
             margin: 0;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            color: #1f2937;
-            background: #f8fafc;
+            color: var(--ink);
+            background: var(--bg);
           }
-          main {
-            max-width: 760px;
-            margin: 56px auto;
-            padding: 0 24px;
+          .shell {
+            min-height: 100vh;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+          }
+          header {
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--line);
+            background: var(--panel);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
           }
           h1 {
-            font-size: 32px;
-            margin-bottom: 8px;
+            font-size: 20px;
+            margin: 0;
           }
-          p {
-            line-height: 1.55;
+          .sub {
+            color: var(--muted);
+            font-size: 13px;
+            margin-top: 3px;
           }
-          code {
-            background: #e5e7eb;
-            padding: 2px 6px;
-            border-radius: 6px;
+          .status {
+            color: var(--muted);
+            font-size: 13px;
+            text-align: right;
           }
-          .links {
+          main {
+            width: min(980px, 100%);
+            margin: 0 auto;
+            padding: 18px;
+            display: grid;
+            grid-template-rows: 1fr auto;
+            gap: 14px;
+          }
+          #messages {
+            min-height: 360px;
+            max-height: calc(100vh - 220px);
+            overflow: auto;
+            padding: 8px 2px;
+          }
+          .msg {
+            width: fit-content;
+            max-width: min(720px, 92%);
+            padding: 12px 14px;
+            margin: 10px 0;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+          }
+          .msg.user {
+            margin-left: auto;
+            background: var(--user);
+            border-color: #b6e2da;
+          }
+          .msg.assistant {
+            background: var(--assistant);
+          }
+          .msg.system {
+            margin-left: auto;
+            margin-right: auto;
+            background: #fff8e6;
+            color: #7a4d00;
+          }
+          details {
+            margin: 6px 0 14px;
+            color: var(--muted);
+            font-size: 12px;
+          }
+          pre {
+            overflow: auto;
+            padding: 10px;
+            border: 1px solid var(--line);
+            background: #ffffff;
+            border-radius: 8px;
+          }
+          .composer {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            border-radius: 8px;
+            padding: 12px;
+          }
+          .row {
             display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin-top: 24px;
+            align-items: center;
+            gap: 10px;
           }
-          a {
-            color: #0f766e;
+          textarea {
+            width: 100%;
+            min-height: 48px;
+            max-height: 120px;
+            resize: vertical;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 12px;
+            font: inherit;
+          }
+          button {
+            border: 1px solid var(--line);
+            background: #ffffff;
+            color: var(--ink);
+            border-radius: 8px;
+            min-height: 42px;
+            padding: 0 14px;
+            font: inherit;
             font-weight: 650;
+            cursor: pointer;
+          }
+          button:hover { border-color: var(--accent); }
+          button:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+          }
+          .primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #ffffff;
+          }
+          .primary:hover {
+            background: var(--accent-strong);
+          }
+          .danger {
+            color: var(--danger);
+          }
+          #micButton.recording {
+            background: #fee4e2;
+            border-color: #fda29b;
+            color: var(--danger);
+          }
+          .controls {
+            justify-content: space-between;
+            margin-top: 10px;
+            flex-wrap: wrap;
+          }
+          .left-controls,
+          .right-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+          }
+          label {
+            color: var(--muted);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+          }
+          @media (max-width: 640px) {
+            header {
+              align-items: flex-start;
+              flex-direction: column;
+            }
+            .status {
+              text-align: left;
+            }
+            main {
+              padding: 12px;
+            }
+            .row,
+            .left-controls,
+            .right-controls {
+              align-items: stretch;
+            }
+            .right-controls,
+            .left-controls,
+            button {
+              width: 100%;
+            }
           }
         </style>
       </head>
       <body>
-        <main>
-          <h1>Appointment Scheduling AI Agent</h1>
-          <p>The FastAPI server is running. Use the API docs to try chat requests from your browser.</p>
-          <p>Available endpoints: <code>GET /health</code>, <code>POST /chat</code>, and <code>POST /voice</code>.</p>
-          <div class="links">
-            <a href="/docs">Open API Docs</a>
-            <a href="/health">Health Check</a>
-          </div>
-        </main>
+        <div class="shell">
+          <header>
+            <div>
+              <h1>Appointment Scheduling AI Agent</h1>
+              <div class="sub">Schedule, reschedule, or cancel demo appointments with typed chat or voice.</div>
+            </div>
+            <div class="status" id="status">Ready</div>
+          </header>
+
+          <main>
+            <section id="messages" aria-live="polite"></section>
+
+            <section class="composer" aria-label="Chat composer">
+              <textarea id="messageInput" placeholder="Type a message, for example: I need a cardiology appointment next Tuesday morning"></textarea>
+              <div class="row controls">
+                <div class="left-controls">
+                  <button id="micButton" type="button" title="Hold to talk">Hold to talk</button>
+                  <button id="interruptButton" type="button" class="danger" title="Stop current speech">Interrupt</button>
+                  <label><input id="autoSpeak" type="checkbox" checked /> Speak replies</label>
+                  <label><input id="debugToggle" type="checkbox" /> Show tool trace</label>
+                </div>
+                <div class="right-controls">
+                  <button id="clearButton" type="button">Clear</button>
+                  <button id="sendButton" type="button" class="primary">Send</button>
+                </div>
+              </div>
+            </section>
+          </main>
+        </div>
+
+        <script>
+          const sessionId = crypto.randomUUID();
+          const messages = document.getElementById("messages");
+          const input = document.getElementById("messageInput");
+          const sendButton = document.getElementById("sendButton");
+          const micButton = document.getElementById("micButton");
+          const interruptButton = document.getElementById("interruptButton");
+          const clearButton = document.getElementById("clearButton");
+          const statusEl = document.getElementById("status");
+          const autoSpeak = document.getElementById("autoSpeak");
+          const debugToggle = document.getElementById("debugToggle");
+
+          let currentAudio = null;
+          let speechController = null;
+          let mediaRecorder = null;
+          let mediaStream = null;
+          let audioChunks = [];
+          let busy = false;
+
+          function setStatus(text) {
+            statusEl.textContent = text;
+          }
+
+          function addMessage(role, text) {
+            const bubble = document.createElement("div");
+            bubble.className = `msg ${role}`;
+            bubble.textContent = text;
+            messages.appendChild(bubble);
+            messages.scrollTop = messages.scrollHeight;
+          }
+
+          function addToolTrace(toolCalls) {
+            if (!debugToggle.checked || !toolCalls || toolCalls.length === 0) return;
+            const details = document.createElement("details");
+            details.open = true;
+            const summary = document.createElement("summary");
+            summary.textContent = `Tool trace (${toolCalls.length})`;
+            const pre = document.createElement("pre");
+            pre.textContent = JSON.stringify(toolCalls, null, 2);
+            details.appendChild(summary);
+            details.appendChild(pre);
+            messages.appendChild(details);
+            messages.scrollTop = messages.scrollHeight;
+          }
+
+          function setBusy(value) {
+            busy = value;
+            sendButton.disabled = value;
+            input.disabled = value;
+          }
+
+          function interruptSpeech() {
+            if (speechController) {
+              speechController.abort();
+              speechController = null;
+            }
+            if (currentAudio) {
+              currentAudio.pause();
+              currentAudio.currentTime = 0;
+              currentAudio = null;
+            }
+            setStatus("Ready");
+          }
+
+          async function speak(text) {
+            if (!autoSpeak.checked || !text) return;
+            interruptSpeech();
+            speechController = new AbortController();
+            setStatus("Generating speech...");
+            try {
+              const response = await fetch("/speak", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text }),
+                signal: speechController.signal
+              });
+              if (!response.ok) {
+                setStatus("Ready");
+                return;
+              }
+              const blob = await response.blob();
+              const url = URL.createObjectURL(blob);
+              currentAudio = new Audio(url);
+              currentAudio.onplay = () => setStatus("Speaking...");
+              currentAudio.onended = () => {
+                URL.revokeObjectURL(url);
+                currentAudio = null;
+                setStatus("Ready");
+              };
+              currentAudio.onerror = () => {
+                URL.revokeObjectURL(url);
+                currentAudio = null;
+                setStatus("Ready");
+              };
+              await currentAudio.play();
+            } catch (error) {
+              if (error.name !== "AbortError") {
+                addMessage("system", "Speech playback was unavailable, but the text response is shown above.");
+              }
+              setStatus("Ready");
+            } finally {
+              speechController = null;
+            }
+          }
+
+          async function handleAgentResponse(payload) {
+            addMessage("assistant", payload.message);
+            addToolTrace(payload.tool_calls);
+            await speak(payload.message);
+          }
+
+          async function sendText() {
+            const text = input.value.trim();
+            if (!text || busy) return;
+            input.value = "";
+            interruptSpeech();
+            addMessage("user", text);
+            setBusy(true);
+            setStatus("Thinking...");
+            try {
+              const response = await fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: text, session_id: sessionId })
+              });
+              if (!response.ok) throw new Error(await response.text());
+              await handleAgentResponse(await response.json());
+            } catch (error) {
+              addMessage("system", `Request failed: ${error.message}`);
+            } finally {
+              setBusy(false);
+              setStatus("Ready");
+              input.focus();
+            }
+          }
+
+          async function sendVoice(blob) {
+            interruptSpeech();
+            setBusy(true);
+            setStatus("Transcribing...");
+            try {
+              const data = new FormData();
+              data.append("session_id", sessionId);
+              data.append("audio", blob, "voice.webm");
+              const response = await fetch("/voice", { method: "POST", body: data });
+              if (!response.ok) throw new Error(await response.text());
+              const payload = await response.json();
+              addMessage("user", payload.transcription || "[voice message]");
+              await handleAgentResponse(payload.response);
+            } catch (error) {
+              addMessage("system", `Voice request failed: ${error.message}`);
+            } finally {
+              setBusy(false);
+              setStatus("Ready");
+              input.focus();
+            }
+          }
+
+          async function startRecording(event) {
+            event.preventDefault();
+            if (busy || mediaRecorder) return;
+            interruptSpeech();
+            try {
+              mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              audioChunks = [];
+              mediaRecorder = new MediaRecorder(mediaStream);
+              mediaRecorder.ondataavailable = (evt) => {
+                if (evt.data.size > 0) audioChunks.push(evt.data);
+              };
+              mediaRecorder.onstop = () => {
+                const blob = new Blob(audioChunks, { type: "audio/webm" });
+                mediaStream.getTracks().forEach((track) => track.stop());
+                mediaRecorder = null;
+                mediaStream = null;
+                micButton.classList.remove("recording");
+                micButton.textContent = "Hold to talk";
+                if (blob.size > 0) sendVoice(blob);
+              };
+              mediaRecorder.start();
+              micButton.classList.add("recording");
+              micButton.textContent = "Release to send";
+              setStatus("Listening...");
+            } catch (error) {
+              addMessage("system", `Microphone unavailable: ${error.message}`);
+              setStatus("Ready");
+            }
+          }
+
+          function stopRecording(event) {
+            if (event) event.preventDefault();
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+              mediaRecorder.stop();
+            }
+          }
+
+          sendButton.addEventListener("click", sendText);
+          input.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              sendText();
+            }
+          });
+          interruptButton.addEventListener("click", interruptSpeech);
+          clearButton.addEventListener("click", () => {
+            interruptSpeech();
+            messages.innerHTML = "";
+            addMessage("assistant", "Hi, I can help schedule, reschedule, or cancel a demo appointment. What would you like to do?");
+          });
+          micButton.addEventListener("pointerdown", startRecording);
+          micButton.addEventListener("pointerup", stopRecording);
+          micButton.addEventListener("pointercancel", stopRecording);
+          micButton.addEventListener("pointerleave", stopRecording);
+
+          addMessage("assistant", "Hi, I can help schedule, reschedule, or cancel a demo appointment. What would you like to do?");
+        </script>
       </body>
     </html>
     """
@@ -85,10 +484,24 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/favicon.ico")
+def favicon() -> Response:
+    return Response(status_code=204)
+
+
 @app.post("/chat")
 def chat(request: ChatRequest) -> dict:
     response = agent.handle_message(request.message, session_id=request.session_id)
     return response.model_dump(mode="json")
+
+
+@app.post("/speak")
+def speak(request: SpeakRequest) -> Response:
+    try:
+        audio = synthesize_speech_bytes(request.text)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return Response(content=audio, media_type="audio/mpeg")
 
 
 @app.post("/voice")
@@ -102,11 +515,14 @@ async def voice(
         temp_audio.write(await audio.read())
         temp_audio_path = temp_audio.name
 
-    transcription = transcribe_audio(temp_audio_path)
-    response = agent.handle_message(transcription, session_id=session_id)
-    output_path = tts_output_path
-    if output_path:
-        synthesize_speech(response.message, output_path)
+    try:
+        transcription = transcribe_audio(temp_audio_path)
+        response = agent.handle_message(transcription, session_id=session_id)
+        output_path = tts_output_path
+        if output_path:
+            synthesize_speech(response.message, output_path)
+    finally:
+        Path(temp_audio_path).unlink(missing_ok=True)
 
     return {
         "transcription": transcription,
