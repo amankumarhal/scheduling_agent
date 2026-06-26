@@ -88,6 +88,14 @@ def test_expanded_urgent_terms_trigger_emergency_response() -> None:
     assert mock.calls == 0
 
 
+def test_fall_and_head_injury_trigger_emergency_response() -> None:
+    mock = MockOpenAIClient()
+    agent = AppointmentOrchestrator(openai_client=mock)
+    response = agent.handle_message("I fell and hit my head. Can I get an appointment?", session_id="fall")
+    assert response.message == EMERGENCY_RESPONSE
+    assert mock.calls == 0
+
+
 def test_emergency_response_does_not_continue_scheduling() -> None:
     mock = MockOpenAIClient()
     agent = AppointmentOrchestrator(openai_client=mock)

@@ -72,6 +72,8 @@ flowchart TD
 7. If auto-speak is enabled, the browser tries `/speak/stream` first.
 8. If streaming TTS is unavailable, the browser falls back to `/speak`.
 
+The async FastAPI voice and chat-stream routes offload blocking STT, LLM, and optional file-based TTS work with `asyncio.to_thread()`. That keeps the event loop responsive while provider SDK calls and deterministic tool execution run in worker threads.
+
 ## Core Components
 
 ### `app/api.py`
@@ -352,6 +354,11 @@ I’m sorry you’re experiencing that. I’m not able to handle emergencies. Pl
 ```
 
 The session enters emergency mode and does not continue scheduling unless the user clarifies that it is not an emergency.
+
+There are two emergency checks on purpose:
+
+- The intent classifier marks obvious urgent messages as `emergency`.
+- The orchestrator also runs `is_emergency()` directly as a safety backstop before calling the LLM.
 
 ## Provider and Specialty Matching
 

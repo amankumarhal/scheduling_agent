@@ -194,11 +194,12 @@ class AppointmentOrchestrator:
         state = self.get_state(session_id)
         intent = classify_intent(message)
         state.last_intent = intent
+        emergency_detected = intent.intent == "emergency" or is_emergency(message)
 
         if state.emergency_active and not is_emergency_clarification(message):
             self.session_logger.log(session_id, "user", {"message": message})
             return self._record_assistant_response(state, EMERGENCY_RESPONSE)
-        if intent.intent == "emergency" and not is_emergency_clarification(message):
+        if emergency_detected and not is_emergency_clarification(message):
             state.emergency_active = True
             self.session_logger.log(session_id, "user", {"message": message})
             return self._record_assistant_response(state, EMERGENCY_RESPONSE)

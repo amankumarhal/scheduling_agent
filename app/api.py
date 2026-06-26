@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -694,7 +695,7 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
     """Return an SSE response for browser chat rendering."""
     async def event_stream():
         """Emit the completed assistant message as SSE delta and final events."""
-        response = agent.handle_message(request.message, session_id=request.session_id)
+        response = await asyncio.to_thread(agent.handle_message, request.message, request.session_id)
         yield f"event: delta\ndata: {json.dumps({'text': response.message})}\n\n"
         yield f"event: final\ndata: {response.model_dump_json()}\n\n"
 
@@ -742,11 +743,11 @@ async def voice(
         temp_audio_path = temp_audio.name
 
     try:
-        transcription = transcribe_audio(temp_audio_path)
-        response = agent.handle_message(transcription, session_id=session_id)
+        transcription = await asyncio.to_thread(transcribe_audio, temp_audio_path)
+        response = await asyncio.to_thread(agent.handle_message, transcription, session_id)
         output_path = tts_output_path
         if output_path:
-            synthesize_speech(response.message, output_path)
+            await asyncio.to_thread(synthesize_speech, response.message, output_path)
     finally:
         Path(temp_audio_path).unlink(missing_ok=True)
 
