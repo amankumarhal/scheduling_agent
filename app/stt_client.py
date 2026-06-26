@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+from functools import lru_cache
 from pathlib import Path
 from urllib.error import URLError
 from urllib.parse import urlencode
@@ -10,6 +11,11 @@ from urllib.request import Request, urlopen
 from openai import OpenAI, OpenAIError
 
 from app.config import Settings, get_settings
+
+
+@lru_cache
+def _openai_audio_client(api_key: str) -> OpenAI:
+    return OpenAI(api_key=api_key)
 
 
 def transcribe_audio(file_path: str) -> str:
@@ -79,7 +85,7 @@ def _transcribe_with_openai(path: Path, settings: Settings) -> str:
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not set. Cannot transcribe audio with OpenAI.")
 
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = _openai_audio_client(settings.openai_api_key)
     try:
         with path.open("rb") as audio_file:
             transcript = client.audio.transcriptions.create(

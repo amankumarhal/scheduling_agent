@@ -224,6 +224,8 @@ A production version could add true token streaming from the LLM and handle tool
 
 The current design is simpler and easier to explain in a technical walkthrough.
 
+The endpoint no longer adds an artificial word-by-word delay after the response is complete. The larger remaining latency improvement is a tool-aware LLM streaming loop that can stream natural-language tokens before and after tool execution.
+
 ## Urgency Handling
 
 Urgency detection happens before the LLM is called. If the user mentions severe chest pain, trouble breathing, severe bleeding, stroke symptoms, suicidal ideation, excruciating pain, injury, accident, or another life-threatening concern, the assistant returns the 911 response and stops scheduling.

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -671,11 +670,7 @@ def chat(request: ChatRequest) -> dict:
 async def chat_stream(request: ChatRequest) -> StreamingResponse:
     async def event_stream():
         response = agent.handle_message(request.message, session_id=request.session_id)
-        words = response.message.split(" ")
-        for index, word in enumerate(words):
-            suffix = " " if index < len(words) - 1 else ""
-            yield f"event: delta\ndata: {json.dumps({'text': word + suffix})}\n\n"
-            await asyncio.sleep(0.025)
+        yield f"event: delta\ndata: {json.dumps({'text': response.message})}\n\n"
         yield f"event: final\ndata: {response.model_dump_json()}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

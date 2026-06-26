@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Iterator
 from urllib.error import URLError
@@ -10,6 +11,11 @@ from urllib.request import Request, urlopen
 from openai import OpenAI, OpenAIError
 
 from app.config import Settings, get_settings
+
+
+@lru_cache
+def _openai_audio_client(api_key: str) -> OpenAI:
+    return OpenAI(api_key=api_key)
 
 
 def synthesize_speech_bytes(text: str) -> bytes:
@@ -183,7 +189,7 @@ def _synthesize_with_deepgram(text: str, settings: Settings) -> bytes:
 def _synthesize_with_openai_bytes(text: str, settings: Settings) -> bytes:
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not set. Cannot synthesize speech with OpenAI.")
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = _openai_audio_client(settings.openai_api_key)
     try:
         with client.audio.speech.with_streaming_response.create(
             model=settings.openai_tts_model,

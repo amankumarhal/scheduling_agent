@@ -16,6 +16,9 @@ from app.store import InMemoryAppointmentStore, create_default_store
 from app.text_utils import normalize_for_voice
 
 
+MAX_LLM_HISTORY_MESSAGES = 12
+
+
 EMERGENCY_PATTERNS = [
     r"\b(chest pain|severe chest pain)\b",
     r"\b(trouble breathing|can't breathe|cannot breathe|shortness of breath)\b",
@@ -202,14 +205,7 @@ class AppointmentOrchestrator:
             "user",
             {"message": message, "intent": intent.model_dump(mode="json")},
         )
-        intent_context = {
-            "role": "system",
-            "content": (
-                "Latest intent classification, use as guidance but keep deterministic tool validation: "
-                f"{intent.model_dump_json()}"
-            ),
-        }
-        llm_messages = [{"role": "system", "content": SYSTEM_PROMPT}, intent_context] + state.messages
+        llm_messages = self._llm_messages(state, intent)
 
         local_tool_calls: list[ToolCallRecord] = []
         for _ in range(5):
@@ -222,8 +218,9 @@ class AppointmentOrchestrator:
                 self.session_logger.log(session_id, "assistant", {"message": content})
                 return self._agent_response(state, content, local_tool_calls)
 
-            llm_messages.append(self._assistant_tool_message_for_history(assistant_message))
-            state.messages.append(self._assistant_tool_message_for_history(assistant_message))
+            assistant_history = self._assistant_tool_message_for_history(assistant_message)
+            llm_messages.append(assistant_history)
+            state.messages.append(assistant_history)
             for tool_call in tool_calls:
                 record, tool_message = self._execute_tool_call(tool_call, state)
                 local_tool_calls.append(record)
@@ -348,6 +345,37 @@ class AppointmentOrchestrator:
             "emergency_active": state.emergency_active,
             "last_intent": state.last_intent.model_dump(mode="json") if state.last_intent else None,
         }
+
+    def _llm_messages(self, state: ConversationState, intent: Any) -> list[dict[str, Any]]:
+        intent_context = {
+            "role": "system",
+            "content": (
+                "Latest intent classification, use as guidance but keep deterministic tool validation: "
+                f"{intent.model_dump_json()}"
+            ),
+        }
+        state_context = {
+            "role": "system",
+            "content": json.dumps(
+                {
+                    "pending_action": state.pending_action,
+                    "pending_slot_id": state.pending_slot_id,
+                    "pending_booking_id": state.pending_booking_id,
+                    "last_offered_slot_ids": [slot.slot_id for slot in state.last_offered_slots],
+                }
+            ),
+        }
+        conversational_history = []
+        for item in state.messages:
+            if item.get("role") == "tool" or item.get("tool_calls"):
+                continue
+            conversational_history.append(item)
+        return [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            intent_context,
+            state_context,
+            *conversational_history[-MAX_LLM_HISTORY_MESSAGES:],
+        ]
 
     @staticmethod
     def _extract_message(response: Any) -> Any:

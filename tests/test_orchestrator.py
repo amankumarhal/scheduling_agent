@@ -8,9 +8,11 @@ class MockOpenAIClient:
     def __init__(self, responses: list[dict] | None = None):
         self.responses = responses or []
         self.calls = 0
+        self.last_messages = None
 
     def call_llm(self, messages, tools=None, tool_choice="auto"):
         self.calls += 1
+        self.last_messages = messages
         if self.responses:
             return self.responses.pop(0)
         return {
@@ -128,3 +130,19 @@ def test_orchestrator_can_lookup_existing_booking_by_phone() -> None:
     assert response.tool_calls[0].output["appointment_details"][0]["provider_name"] == "Dr. Elena Rivera"
     assert response.tool_calls[0].output["appointment_details"][0]["location"] == "Heart Center"
     assert booking.booking_id in response.message
+
+
+def test_orchestrator_bounds_llm_history() -> None:
+    mock = MockOpenAIClient([assistant_response("I can help with that. What specialty do you need?")])
+    agent = AppointmentOrchestrator(openai_client=mock)
+    state = agent.get_state("history")
+    for index in range(30):
+        state.messages.append({"role": "user", "content": f"user {index}"})
+        state.messages.append({"role": "assistant", "content": f"assistant {index}"})
+        state.messages.append({"role": "tool", "content": '{"large":"payload"}'})
+
+    agent.handle_message("I need an appointment.", session_id="history")
+
+    assert mock.last_messages is not None
+    assert len(mock.last_messages) <= 15
+    assert all(message.get("role") != "tool" for message in mock.last_messages)

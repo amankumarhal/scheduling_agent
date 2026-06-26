@@ -35,6 +35,19 @@ SPECIALTY_ALIASES = {
     "pt": "Physical therapy",
 }
 
+SPECIALTY_CANDIDATES = tuple((candidate.lower(), label) for candidate, label in SPECIALTY_ALIASES.items())
+SPECIALTY_CANONICALS = tuple((specialty.lower(), specialty) for specialty in SPECIALTIES)
+FUZZY_SPECIALTY_TERMS = tuple(
+    sorted(
+        {
+            *SPECIALTY_CANDIDATES,
+            *SPECIALTY_CANONICALS,
+        },
+        key=lambda item: len(item[0]),
+        reverse=True,
+    )
+)
+
 EMERGENCY_PATTERNS = [
     r"\b(chest pain|chest hurts|severe chest pain)\b",
     r"\b(trouble breathing|can't breathe|cannot breathe|shortness of breath)\b",
@@ -138,19 +151,32 @@ def _matches_any(text: str, patterns: list[str]) -> bool:
 
 
 def _extract_specialty(text: str) -> str | None:
-    for alias, specialty in SPECIALTY_ALIASES.items():
+    for alias, specialty in SPECIALTY_CANDIDATES:
         if re.search(rf"\b{re.escape(alias)}\b", text):
             return specialty
-    best_specialty = None
+    for specialty_text, specialty in SPECIALTY_CANONICALS:
+        if re.search(rf"\b{re.escape(specialty_text)}\b", text):
+            return specialty
+
+    if len(text) > 80:
+        return None
+
+    best_specialty: str | None = None
     best_score = 0.0
     words = re.findall(r"[a-z]+", text)
     spans = words + [" ".join(words[index : index + 2]) for index in range(max(len(words) - 1, 0))]
-    for span in spans:
-        for candidate in [*SPECIALTIES, *SPECIALTY_ALIASES.keys()]:
+    for span in spans[:30]:
+        if len(span) < 3:
+            continue
+        for candidate, specialty in FUZZY_SPECIALTY_TERMS:
+            if abs(len(span) - len(candidate)) > 5:
+                continue
             score = SequenceMatcher(None, span, candidate.lower()).ratio()
             if score > best_score:
                 best_score = score
-                best_specialty = SPECIALTY_ALIASES.get(candidate, candidate)
+                best_specialty = specialty
+            if best_score >= 0.92:
+                return best_specialty
     return best_specialty if best_score >= 0.78 else None
 
 

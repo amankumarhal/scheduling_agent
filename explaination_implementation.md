@@ -24,6 +24,8 @@ Audio provider selection uses `auto`, `deepgram`, `cartesia`, or `openai`. In `a
 
 Cartesia TTS can use an SSE stream. The backend proxies streamed audio chunks to the browser, and the browser schedules raw PCM chunks with Web Audio so playback can begin earlier than full-file TTS.
 
+Latency work removes the artificial word-by-word delay from `/chat/stream`, bounds the conversation history sent to the LLM, avoids duplicate tool-message serialization, reuses OpenAI audio clients, reduces classifier fuzzy matching work, and moves session log writes off the request path. Full token-level LLM streaming with tool-call support is still a larger future improvement.
+
 Slot search understands simple relative dates like today and tomorrow. If a preferred date or time has no exact match, the tool returns the soonest alternatives in the same result so the assistant can offer them immediately.
 
 Specialty search normalizes common specialist roles and misspellings. For example, dermatologist, dermitalogist, and skin doctor all resolve to dermatology before slot lookup.
