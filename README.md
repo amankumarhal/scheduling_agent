@@ -125,6 +125,8 @@ CARTESIA_TTS_VOICE_ID=694f9389-aac1-45b6-b726-9d9369183238
 CARTESIA_TTS_CONTAINER=wav
 CARTESIA_TTS_ENCODING=pcm_f32le
 CARTESIA_TTS_SAMPLE_RATE=44100
+CARTESIA_STREAMING_TTS=true
+CARTESIA_TTS_SPEED=1.0
 SESSION_LOG_DIR=logs/sessions
 APPOINTMENT_DATA_DIR=data
 DEBUG=true
@@ -135,6 +137,8 @@ If `gpt-5.5` is not available in your account, keep the code unchanged and set `
 For STT, set `AUDIO_STT_PROVIDER` to `auto`, `deepgram`, or `openai`.
 
 For TTS, set `AUDIO_TTS_PROVIDER` to `auto`, `cartesia`, `deepgram`, or `openai`. In `auto`, Cartesia is used first when `CARTESIA_API_KEY` exists, then Deepgram when `DEEPGRAM_API_KEY` exists, then OpenAI. For a clear Cartesia latency test, set `AUDIO_TTS_PROVIDER=cartesia`.
+
+When Cartesia is selected and `CARTESIA_STREAMING_TTS=true`, the browser uses `/speak/stream` to start playback from streamed PCM chunks instead of waiting for a complete audio file.
 
 ## Run The CLI
 
@@ -196,6 +200,7 @@ Endpoints:
 - `POST /chat` with `{ "message": "...", "session_id": "..." }`
 - `POST /chat/stream` with `{ "message": "...", "session_id": "..." }`
 - `POST /speak` with `{ "text": "..." }`
+- `POST /speak/stream` with `{ "text": "..." }` for Cartesia streaming TTS
 - `POST /voice` with an uploaded audio file and `session_id`
 
 ## Run Tests

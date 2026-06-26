@@ -108,6 +108,7 @@ The UI calls:
 - `POST /chat/stream` for streaming-style text responses
 - `POST /voice` for audio input
 - `POST /speak` for TTS audio output
+- `POST /speak/stream` for Cartesia streaming TTS chunks
 
 ### FastAPI API
 
@@ -121,6 +122,7 @@ Endpoints:
 - `POST /chat/stream`
 - `POST /voice`
 - `POST /speak`
+- `POST /speak/stream`
 
 ### Orchestrator
 
@@ -185,7 +187,7 @@ Provider usage is isolated behind small adapters:
 - `stt_client.py` for Deepgram or OpenAI transcription
 - `tts_client.py` for Cartesia, Deepgram, or OpenAI speech generation
 
-This keeps provider details away from business logic. STT or TTS can be replaced without rewriting the orchestrator.
+This keeps provider details away from business logic. STT or TTS can be replaced without rewriting the orchestrator. Cartesia can also stream TTS chunks through `/speak/stream` so browser playback can begin before a full audio file is generated.
 
 ### Text Normalization
 

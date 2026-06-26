@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     cartesia_tts_container: str = Field(default="wav", alias="CARTESIA_TTS_CONTAINER")
     cartesia_tts_encoding: str = Field(default="pcm_f32le", alias="CARTESIA_TTS_ENCODING")
     cartesia_tts_sample_rate: int = Field(default=44100, ge=8000, le=48000, alias="CARTESIA_TTS_SAMPLE_RATE")
+    cartesia_streaming_tts: bool = Field(default=True, alias="CARTESIA_STREAMING_TTS")
+    cartesia_tts_speed: float = Field(default=1.0, ge=0.5, le=2.0, alias="CARTESIA_TTS_SPEED")
     cartesia_timeout_seconds: float = Field(default=12.0, ge=1.0, le=60.0, alias="CARTESIA_TIMEOUT_SECONDS")
     session_log_dir: str = Field(default="logs/sessions", alias="SESSION_LOG_DIR")
     appointment_data_dir: str = Field(default="data", alias="APPOINTMENT_DATA_DIR")

@@ -22,6 +22,8 @@ Speech output uses OpenAI's configurable TTS speed setting. The default is `1.25
 
 Audio provider selection uses `auto`, `deepgram`, `cartesia`, or `openai`. In `auto`, Cartesia is preferred for TTS when its key exists, then Deepgram, then OpenAI.
 
+Cartesia TTS can use an SSE stream. The backend proxies streamed audio chunks to the browser, and the browser schedules raw PCM chunks with Web Audio so playback can begin earlier than full-file TTS.
+
 Slot search understands simple relative dates like today and tomorrow. If a preferred date or time has no exact match, the tool returns the soonest alternatives in the same result so the assistant can offer them immediately.
 
 ## User Information

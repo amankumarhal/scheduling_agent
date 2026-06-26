@@ -2,7 +2,7 @@ import json
 
 from app.config import get_settings
 from app.stt_client import transcribe_audio
-from app.tts_client import speech_media_type, synthesize_speech_bytes
+from app.tts_client import speech_media_type, stream_cartesia_sse_events, synthesize_speech_bytes
 
 
 class StubHttpResponse:
@@ -17,6 +17,9 @@ class StubHttpResponse:
 
     def read(self) -> bytes:
         return self.payload
+
+    def __iter__(self):
+        return iter(self.payload.splitlines(keepends=True))
 
 
 def reset_settings(monkeypatch) -> None:
@@ -103,3 +106,25 @@ def test_auto_tts_prefers_cartesia_when_key_exists(monkeypatch) -> None:
     monkeypatch.setattr("app.tts_client.urlopen", stub_urlopen)
 
     assert synthesize_speech_bytes("Hello") == b"cartesia-bytes"
+
+
+def test_cartesia_streaming_tts_yields_audio_chunks(monkeypatch) -> None:
+    reset_settings(monkeypatch)
+    monkeypatch.setenv("AUDIO_TTS_PROVIDER", "cartesia")
+    monkeypatch.setenv("CARTESIA_API_KEY", "cartesia_test")
+    get_settings.cache_clear()
+
+    def stub_urlopen(request, timeout):
+        assert request.full_url == "https://api.cartesia.ai/tts/sse"
+        assert request.headers["X-api-key"] == "cartesia_test"
+        body = json.loads(request.data.decode("utf-8"))
+        assert body["output_format"]["container"] == "raw"
+        payload = b'data: {"type":"chunk","data":"AAAA","done":false}\n\ndata: {"type":"done"}\n\n'
+        return StubHttpResponse(payload)
+
+    monkeypatch.setattr("app.tts_client.urlopen", stub_urlopen)
+
+    events = list(stream_cartesia_sse_events("Hello"))
+    assert events == [
+        {"type": "chunk", "data": "AAAA", "encoding": "pcm_f32le", "sample_rate": 44100}
+    ]

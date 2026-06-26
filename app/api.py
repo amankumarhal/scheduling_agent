@@ -11,7 +11,13 @@ from pydantic import BaseModel
 
 from app.orchestrator import AppointmentOrchestrator
 from app.stt_client import transcribe_audio
-from app.tts_client import speech_media_type, synthesize_speech, synthesize_speech_bytes
+from app.tts_client import (
+    cartesia_streaming_enabled,
+    speech_media_type,
+    stream_cartesia_sse_events,
+    synthesize_speech,
+    synthesize_speech_bytes,
+)
 
 app = FastAPI(title="Appointment Scheduling AI Agent")
 agent = AppointmentOrchestrator()
@@ -274,6 +280,9 @@ def home() -> str:
           const debugToggle = document.getElementById("debugToggle");
 
           let currentAudio = null;
+          let currentAudioContext = null;
+          let currentAudioSources = [];
+          let nextAudioStartTime = 0;
           let speechController = null;
           let mediaRecorder = null;
           let mediaStream = null;
@@ -337,7 +346,119 @@ def home() -> str:
               currentAudio.currentTime = 0;
               currentAudio = null;
             }
+            currentAudioSources.forEach((source) => {
+              try {
+                source.stop();
+              } catch (error) {}
+            });
+            currentAudioSources = [];
+            if (currentAudioContext) {
+              currentAudioContext.close();
+              currentAudioContext = null;
+            }
+            nextAudioStartTime = 0;
             setStatus("Ready");
+          }
+
+          function base64ToArrayBuffer(base64) {
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let index = 0; index < binary.length; index += 1) {
+              bytes[index] = binary.charCodeAt(index);
+            }
+            return bytes.buffer;
+          }
+
+          function pcmF32ToSamples(arrayBuffer) {
+            const view = new DataView(arrayBuffer);
+            const sampleCount = Math.floor(view.byteLength / 4);
+            const samples = new Float32Array(sampleCount);
+            for (let index = 0; index < sampleCount; index += 1) {
+              samples[index] = view.getFloat32(index * 4, true);
+            }
+            return samples;
+          }
+
+          async function playPcmChunk(chunk) {
+            if (!currentAudioContext) {
+              currentAudioContext = new AudioContext({ sampleRate: chunk.sample_rate || 44100 });
+              nextAudioStartTime = currentAudioContext.currentTime + 0.04;
+            }
+            if (currentAudioContext.state === "suspended") {
+              await currentAudioContext.resume();
+            }
+            const samples = pcmF32ToSamples(base64ToArrayBuffer(chunk.data));
+            if (!samples.length) return;
+            const buffer = currentAudioContext.createBuffer(1, samples.length, chunk.sample_rate || 44100);
+            buffer.copyToChannel(samples, 0);
+            const source = currentAudioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(currentAudioContext.destination);
+            const startAt = Math.max(nextAudioStartTime, currentAudioContext.currentTime + 0.01);
+            source.start(startAt);
+            nextAudioStartTime = startAt + buffer.duration;
+            currentAudioSources.push(source);
+            source.onended = () => {
+              currentAudioSources = currentAudioSources.filter((item) => item !== source);
+              if (currentAudioSources.length === 0) setStatus("Ready");
+            };
+          }
+
+          async function speakWithStream(text) {
+            const response = await fetch("/speak/stream", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text }),
+              signal: speechController.signal
+            });
+            if (!response.ok || !response.body) return false;
+            setStatus("Speaking...");
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const events = buffer.split("\\n\\n");
+              buffer = events.pop() || "";
+              for (const event of events) {
+                const lines = event.split("\\n");
+                const eventType = (lines.find((line) => line.startsWith("event:")) || "event: message").slice(6).trim();
+                const dataLine = lines.find((line) => line.startsWith("data:"));
+                if (!dataLine) continue;
+                const data = JSON.parse(dataLine.slice(5));
+                if (eventType === "chunk") await playPcmChunk(data);
+                if (eventType === "error") throw new Error(data.message || "Streaming speech failed.");
+              }
+            }
+            return true;
+          }
+
+          async function speakWithBlob(text) {
+            const response = await fetch("/speak", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text }),
+              signal: speechController.signal
+            });
+            if (!response.ok) return false;
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            currentAudio = new Audio(url);
+            currentAudio.onplay = () => setStatus("Speaking...");
+            currentAudio.onended = () => {
+              URL.revokeObjectURL(url);
+              currentAudio = null;
+              setStatus("Ready");
+            };
+            currentAudio.onerror = () => {
+              URL.revokeObjectURL(url);
+              currentAudio = null;
+              setStatus("Ready");
+            };
+            await currentAudio.play();
+            return true;
           }
 
           async function speak(text) {
@@ -346,31 +467,8 @@ def home() -> str:
             speechController = new AbortController();
             setStatus("Generating speech...");
             try {
-              const response = await fetch("/speak", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text }),
-                signal: speechController.signal
-              });
-              if (!response.ok) {
-                setStatus("Ready");
-                return;
-              }
-              const blob = await response.blob();
-              const url = URL.createObjectURL(blob);
-              currentAudio = new Audio(url);
-              currentAudio.onplay = () => setStatus("Speaking...");
-              currentAudio.onended = () => {
-                URL.revokeObjectURL(url);
-                currentAudio = null;
-                setStatus("Ready");
-              };
-              currentAudio.onerror = () => {
-                URL.revokeObjectURL(url);
-                currentAudio = null;
-                setStatus("Ready");
-              };
-              await currentAudio.play();
+              const streamed = await speakWithStream(text);
+              if (!streamed) await speakWithBlob(text);
             } catch (error) {
               if (error.name !== "AbortError") {
                 addMessage("system", "Speech playback was unavailable, but the text response is shown above.");
@@ -590,6 +688,22 @@ def speak(request: SpeakRequest) -> Response:
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return Response(content=audio, media_type=speech_media_type())
+
+
+@app.post("/speak/stream")
+def speak_stream(request: SpeakRequest) -> StreamingResponse:
+    if not cartesia_streaming_enabled():
+        raise HTTPException(status_code=409, detail="Cartesia streaming TTS is not enabled.")
+
+    def event_stream():
+        try:
+            for event in stream_cartesia_sse_events(request.text):
+                yield f"event: chunk\ndata: {json.dumps(event)}\n\n"
+            yield "event: done\ndata: {}\n\n"
+        except RuntimeError as exc:
+            yield f"event: error\ndata: {json.dumps({'message': str(exc)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.post("/voice")

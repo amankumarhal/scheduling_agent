@@ -178,6 +178,8 @@ This module handles text-to-speech.
 
 `synthesize_speech_bytes()` returns audio bytes for the browser `/speak` endpoint. The client can use Cartesia, Deepgram, or OpenAI depending on configuration, with fallback enabled by default.
 
+`stream_cartesia_sse_events()` proxies Cartesia SSE chunks for `/speak/stream`, which lets the browser play raw PCM audio through Web Audio as chunks arrive.
+
 ### `app/text_utils.py`
 
 This module makes assistant responses friendlier for speech output.
