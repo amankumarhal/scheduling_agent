@@ -276,7 +276,7 @@ data/
   bookings.json
 ```
 
-This allows bookings and slot status to survive a server restart. Session logs are written separately under `logs/sessions/` and are used for audit and debugging, not as the operational booking store.
+This allows bookings and slot status to survive a server restart. Runtime updates are applied in memory immediately and queued for a coalesced background JSON flush. Session logs are written separately under `logs/sessions/` and are used for audit and debugging, not as the operational booking store.
 
 ## Tradeoffs
 

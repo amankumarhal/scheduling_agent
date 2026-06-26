@@ -167,7 +167,7 @@ Safety rules:
 
 ### Store
 
-The default backend is a JSON-backed local scheduling store with sample appointment data. It persists slot status and bookings under `data/slots.json` and `data/bookings.json`, which allows appointments to survive a server restart without requiring an external database.
+The default backend is a JSON-backed local scheduling store with sample appointment data. It persists slot status and bookings under `data/slots.json` and `data/bookings.json`, which allows appointments to survive a server restart without requiring an external database. Runtime mutations update memory immediately and queue a coalesced background JSON flush, with an explicit flush on shutdown.
 
 The in-memory store remains available for focused unit tests.
 

@@ -262,6 +262,7 @@ def test_json_store_persists_booking_across_instances(tmp_path) -> None:
     first_tools = SchedulingTools(first_store)
     booking = first_tools.book_appointment("slot_card_1", patient(), "Follow-up", True).booking
     assert booking is not None
+    first_store.flush()
 
     second_store = JsonAppointmentStore(tmp_path)
     persisted_booking = second_store.get_booking(booking.booking_id)

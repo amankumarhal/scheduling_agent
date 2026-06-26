@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import atexit
+import threading
+import time
 from copy import deepcopy
 from pathlib import Path
 
@@ -54,9 +57,15 @@ class JsonAppointmentStore(InMemoryAppointmentStore):
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.slots_path = self.data_dir / "slots.json"
         self.bookings_path = self.data_dir / "bookings.json"
+        self._lock = threading.RLock()
+        self._persist_event = threading.Event()
+        self._stop_event = threading.Event()
+        self._persist_thread = threading.Thread(target=self._persist_worker, daemon=True)
         self.slots = self._load_slots()
         self.bookings = self._load_bookings()
-        self._persist()
+        self._persist_now()
+        self._persist_thread.start()
+        atexit.register(self.shutdown)
 
     def _load_slots(self) -> dict[str, AppointmentSlot]:
         if not self.slots_path.exists():
@@ -78,18 +87,45 @@ class JsonAppointmentStore(InMemoryAppointmentStore):
             bookings[booking.booking_id] = booking
         return bookings
 
-    def _persist(self) -> None:
+    def _persist_now(self) -> None:
+        with self._lock:
+            slots_payload = [
+                slot.model_dump(mode="json") for slot in sorted(self.slots.values(), key=lambda item: item.slot_id)
+            ]
+            bookings_payload = [
+                booking.model_dump(mode="json")
+                for booking in sorted(self.bookings.values(), key=lambda item: item.created_at)
+            ]
         self._write_json(
             self.slots_path,
-            [slot.model_dump(mode="json") for slot in sorted(self.slots.values(), key=lambda item: item.slot_id)],
+            slots_payload,
         )
         self._write_json(
             self.bookings_path,
-            [
-                booking.model_dump(mode="json")
-                for booking in sorted(self.bookings.values(), key=lambda item: item.created_at)
-            ],
+            bookings_payload,
         )
+
+    def _request_persist(self) -> None:
+        self._persist_event.set()
+
+    def _persist_worker(self) -> None:
+        while not self._stop_event.is_set():
+            if not self._persist_event.wait(timeout=0.25):
+                continue
+            time.sleep(0.05)
+            self._persist_event.clear()
+            self._persist_now()
+
+    def flush(self) -> None:
+        self._persist_event.clear()
+        self._persist_now()
+
+    def shutdown(self) -> None:
+        if self._stop_event.is_set():
+            return
+        self._stop_event.set()
+        self.flush()
+        self._persist_thread.join(timeout=2)
 
     @staticmethod
     def _write_json(path: Path, payload: list[dict]) -> None:
@@ -100,22 +136,26 @@ class JsonAppointmentStore(InMemoryAppointmentStore):
         temp_path.replace(path)
 
     def save_slot(self, slot: AppointmentSlot) -> None:
-        super().save_slot(slot)
-        self._persist()
+        with self._lock:
+            super().save_slot(slot)
+        self._request_persist()
 
     def add_booking(self, booking: AppointmentBooking) -> AppointmentBooking:
-        result = super().add_booking(booking)
-        self._persist()
+        with self._lock:
+            result = super().add_booking(booking)
+        self._request_persist()
         return result
 
     def save_booking(self, booking: AppointmentBooking) -> AppointmentBooking:
-        result = super().save_booking(booking)
-        self._persist()
+        with self._lock:
+            result = super().save_booking(booking)
+        self._request_persist()
         return result
 
     def reset(self) -> None:
-        super().reset()
-        self._persist()
+        with self._lock:
+            super().reset()
+        self._request_persist()
 
 
 def create_default_store() -> JsonAppointmentStore:

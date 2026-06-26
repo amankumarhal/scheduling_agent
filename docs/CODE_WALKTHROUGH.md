@@ -104,7 +104,7 @@ This module contains the appointment persistence layer.
 
 `InMemoryAppointmentStore` is a lightweight store used mainly for focused tests.
 
-`JsonAppointmentStore` is the default runtime store. It persists:
+`JsonAppointmentStore` is the default runtime store. It keeps runtime state in memory and persists it to:
 
 ```text
 data/slots.json
@@ -120,6 +120,7 @@ Important methods:
 - `get_booking()` retrieves a booking by booking ID.
 - `save_booking()` persists booking updates.
 - `reset()` restores sample slot data.
+- `flush()` forces queued JSON persistence for tests and shutdown.
 
 `create_default_store()` constructs the JSON-backed store used by the orchestrator.
 
