@@ -11,7 +11,7 @@ from app.openai_client import OpenAIClient
 from app.prompts import EMERGENCY_RESPONSE, SYSTEM_PROMPT
 from app.scheduling_tools import SchedulingTools
 from app.session_logger import SessionLogger
-from app.store import InMemoryAppointmentStore
+from app.store import InMemoryAppointmentStore, create_default_store
 from app.text_utils import normalize_for_voice
 
 
@@ -141,7 +141,7 @@ class AppointmentOrchestrator:
         openai_client: OpenAIClient | Any | None = None,
         store: InMemoryAppointmentStore | None = None,
     ):
-        self.store = store or InMemoryAppointmentStore()
+        self.store = store or create_default_store()
         self.tools = SchedulingTools(self.store)
         self.openai_client = openai_client or OpenAIClient()
         self.sessions: dict[str, ConversationState] = {}

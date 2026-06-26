@@ -109,6 +109,7 @@ OPENAI_STT_MODEL=gpt-4o-mini-transcribe
 OPENAI_TTS_MODEL=gpt-4o-mini-tts
 OPENAI_TTS_VOICE=alloy
 SESSION_LOG_DIR=logs/sessions
+APPOINTMENT_DATA_DIR=data
 DEBUG=true
 ```
 
@@ -229,15 +230,27 @@ Expected behavior: the agent says exactly: “I’m sorry you’re experiencing 
 - Kept deterministic scheduling logic separate from LLM orchestration.
 - Used Pydantic schemas for validation and readable tool contracts.
 - Required explicit confirmation for booking, cancellation, and rescheduling.
-- Used an in-memory scheduling backend with sample appointment data.
+- Used a JSON-backed local scheduling store with sample appointment data.
 - Added rule-based emergency detection before normal LLM scheduling.
 - Isolated OpenAI LLM, STT, and TTS clients so providers can be swapped later.
 - Normalized assistant text so TTS hears full weekday and month names.
 - Logged session events as JSONL for debugging and technical review.
 
+## Local Persistence
+
+The application persists appointment state in local JSON files:
+
+```text
+data/
+  slots.json
+  bookings.json
+```
+
+This allows bookings and slot status to survive a server restart. Session logs are written separately under `logs/sessions/` and are used for audit and debugging, not as the operational booking store.
+
 ## Tradeoffs
 
-- The store is in-memory, so data resets when the process restarts.
+- The default store is JSON-backed for local persistence, but it is not a substitute for a transactional production database.
 - Date parsing is intentionally simple for the sample scheduling data.
 - The CLI and API use the same orchestrator, but there is no authentication.
 - Browser voice uses hold-to-talk audio uploads. Real-time voice transport is deferred.

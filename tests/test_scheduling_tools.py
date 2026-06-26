@@ -1,6 +1,6 @@
 from app.models import PatientInfo
 from app.scheduling_tools import SchedulingTools
-from app.store import InMemoryAppointmentStore
+from app.store import InMemoryAppointmentStore, JsonAppointmentStore
 
 
 def make_tools() -> SchedulingTools:
@@ -142,3 +142,19 @@ def test_reschedule_moves_booking_to_new_slot() -> None:
     new_slot = tools.store.get_slot("slot_card_2")
     assert old_slot is not None and old_slot.is_available is True
     assert new_slot is not None and new_slot.is_booked is True
+
+
+def test_json_store_persists_booking_across_instances(tmp_path) -> None:
+    first_store = JsonAppointmentStore(tmp_path)
+    first_tools = SchedulingTools(first_store)
+    booking = first_tools.book_appointment("slot_card_1", patient(), "Follow-up", True).booking
+    assert booking is not None
+
+    second_store = JsonAppointmentStore(tmp_path)
+    persisted_booking = second_store.get_booking(booking.booking_id)
+    persisted_slot = second_store.get_slot("slot_card_1")
+
+    assert persisted_booking is not None
+    assert persisted_booking.booking_id == booking.booking_id
+    assert persisted_slot is not None
+    assert persisted_slot.is_booked is True

@@ -28,7 +28,7 @@ User text or audio
 -> Conversation Orchestrator
 -> GPT-5.5 with tool calling
 -> Deterministic scheduling tools
--> In-memory appointment store
+-> JSON-backed appointment store
 -> Response sanitizer
 -> Session logger
 -> Response text
@@ -47,7 +47,7 @@ flowchart LR
     Orchestrator --> Model[GPT-5.5 Tool Calling]
     Model --> Orchestrator
     Orchestrator --> Tools[Scheduling Tools]
-    Tools --> Store[Appointment Store]
+    Tools --> Store[JSON Appointment Store]
     Orchestrator --> Logger[Session Logger]
     Orchestrator --> Sanitizer[Response Sanitizer]
     Sanitizer --> Client
@@ -161,7 +161,9 @@ Safety rules:
 
 ### Store
 
-The current backend is an in-memory scheduling store with sample appointment data. This makes the project simple to run locally and easy to test without external infrastructure.
+The default backend is a JSON-backed local scheduling store with sample appointment data. It persists slot status and bookings under `data/slots.json` and `data/bookings.json`, which allows appointments to survive a server restart without requiring an external database.
+
+The in-memory store remains available for focused unit tests.
 
 Production replacement options:
 
@@ -201,6 +203,8 @@ Each session writes JSONL events under `logs/sessions`:
 - Tool calls
 
 This is useful for debugging, product review, and technical review. In production, logging would need privacy controls, retention policies, encryption, access controls, and compliance review.
+
+Session logs are separate from the operational booking store. Bookings are retrieved from the JSON appointment store, not reconstructed from logs.
 
 ## Streaming Design
 
