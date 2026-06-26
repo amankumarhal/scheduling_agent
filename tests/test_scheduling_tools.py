@@ -98,12 +98,11 @@ def test_booking_changes_slot_status() -> None:
     assert slot.is_available is False
 
 
-def test_booking_id_has_no_underscore() -> None:
+def test_booking_id_uses_digits_only_for_voice() -> None:
     tools = make_tools()
     result = tools.book_appointment("slot_card_1", patient(), "Follow-up", True)
     assert result.booking is not None
-    assert "_" not in result.booking.booking_id
-    assert result.booking.booking_id.startswith("BK")
+    assert result.booking.booking_id.isdigit()
 
 
 def test_cannot_double_book_same_slot() -> None:

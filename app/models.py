@@ -40,7 +40,7 @@ class AppointmentSlot(BaseModel):
 
 
 class AppointmentBooking(BaseModel):
-    booking_id: str = Field(default_factory=lambda: f"BK{uuid4().hex[:8].upper()}")
+    booking_id: str = Field(default_factory=lambda: str(uuid4().int)[:10])
     slot_id: str
     patient_info: PatientInfo
     appointment_reason: str = Field(..., min_length=1)

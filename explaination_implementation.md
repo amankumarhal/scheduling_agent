@@ -8,7 +8,7 @@ The system is a simple voice-enabled scheduling assistant. A user can send text 
 
 The goal is to keep the system fast, explainable, and easy to operate locally. OpenAI handles STT, TTS, and the LLM. Scheduling state is handled by typed Python tools and a local JSON-backed store.
 
-Booking IDs use a compact `BK` prefix with no underscore so they are easier to read and speak.
+Booking reference numbers use digits only so they are easier to hear and repeat in a voice conversation.
 
 ## Latency Choices
 
