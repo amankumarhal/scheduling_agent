@@ -69,6 +69,29 @@ class AppointmentRequest(BaseModel):
     patient_info: PatientInfo | None = None
 
 
+class IntentEntities(BaseModel):
+    specialty: str | None = None
+    provider: str | None = None
+    date_phrase: str | None = None
+    patient_is_caller: bool | None = None
+
+
+class IntentClassification(BaseModel):
+    intent: Literal[
+        "book",
+        "reschedule",
+        "cancel",
+        "confirm_lookup",
+        "question",
+        "out_of_scope",
+        "emergency",
+        "unclear",
+    ]
+    confidence: Literal["high", "medium", "low"]
+    entities: IntentEntities = Field(default_factory=IntentEntities)
+    ambiguity_flag: str | None = None
+
+
 class SearchSlotsInput(BaseModel):
     specialty: str
     preferred_date: str | None = None
@@ -197,6 +220,7 @@ class ConversationState(BaseModel):
     last_offered_slots: list[AppointmentSlot] = Field(default_factory=list)
     tool_calls: list[ToolCallRecord] = Field(default_factory=list)
     emergency_active: bool = False
+    last_intent: IntentClassification | None = None
 
 
 class AgentResponse(BaseModel):

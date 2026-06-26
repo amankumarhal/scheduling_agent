@@ -55,6 +55,7 @@ def test_orchestrator_asks_for_missing_info_instead_of_hallucinating() -> None:
     response = agent.handle_message("I need an appointment.", session_id="missing")
     assert "what type" in response.message.lower()
     assert response.tool_calls == []
+    assert response.state_summary["last_intent"]["intent"] == "book"
 
 
 def test_orchestrator_keeps_tone_empathetic() -> None:
@@ -73,6 +74,7 @@ def test_emergency_message_triggers_emergency_response() -> None:
     agent = AppointmentOrchestrator(openai_client=mock)
     response = agent.handle_message("I have severe chest pain and need an appointment.", session_id="emergency")
     assert response.message == EMERGENCY_RESPONSE
+    assert response.state_summary["last_intent"]["intent"] == "emergency"
     assert mock.calls == 0
 
 

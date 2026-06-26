@@ -205,6 +205,7 @@ This is the custom agent implementation.
 Main responsibilities:
 
 - Maintain per-session conversation state.
+- Classify the latest user turn into a structured intent before the LLM call.
 - Check emergency rules before model calls.
 - Send conversation messages and tool schemas to GPT-5.5.
 - Parse model tool calls.

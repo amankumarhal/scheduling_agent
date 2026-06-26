@@ -28,6 +28,8 @@ Slot search understands simple relative dates like today and tomorrow. If a pref
 
 Specialty search normalizes common specialist roles and misspellings. For example, dermatologist, dermitalogist, and skin doctor all resolve to dermatology before slot lookup.
 
+Each user turn is classified into one canonical intent before the LLM call. The classifier extracts specialty, provider, date phrase, and whether the patient appears to be the caller. This helps routing, but it never mutates appointments or bypasses confirmation.
+
 ## User Information
 
 Booking requires only patient name, phone number, appointment reason, selected slot, and explicit confirmation. Date of birth is intentionally not collected in this version.

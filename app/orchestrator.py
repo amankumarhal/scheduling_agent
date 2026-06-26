@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from app.intent_classifier import classify_intent
 from app.models import AgentResponse, ConversationState, ToolCallRecord
 from app.openai_client import OpenAIClient
 from app.prompts import EMERGENCY_RESPONSE, SYSTEM_PROMPT
@@ -182,11 +183,13 @@ class AppointmentOrchestrator:
 
     def handle_message(self, message: str, session_id: str = "default") -> AgentResponse:
         state = self.get_state(session_id)
+        intent = classify_intent(message)
+        state.last_intent = intent
 
         if state.emergency_active and not is_emergency_clarification(message):
             self.session_logger.log(session_id, "user", {"message": message})
             return self._record_assistant_response(state, EMERGENCY_RESPONSE)
-        if is_emergency(message) and not is_emergency_clarification(message):
+        if intent.intent == "emergency" and not is_emergency_clarification(message):
             state.emergency_active = True
             self.session_logger.log(session_id, "user", {"message": message})
             return self._record_assistant_response(state, EMERGENCY_RESPONSE)
@@ -194,8 +197,19 @@ class AppointmentOrchestrator:
             state.emergency_active = False
 
         state.messages.append({"role": "user", "content": message})
-        self.session_logger.log(session_id, "user", {"message": message})
-        llm_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + state.messages
+        self.session_logger.log(
+            session_id,
+            "user",
+            {"message": message, "intent": intent.model_dump(mode="json")},
+        )
+        intent_context = {
+            "role": "system",
+            "content": (
+                "Latest intent classification, use as guidance but keep deterministic tool validation: "
+                f"{intent.model_dump_json()}"
+            ),
+        }
+        llm_messages = [{"role": "system", "content": SYSTEM_PROMPT}, intent_context] + state.messages
 
         local_tool_calls: list[ToolCallRecord] = []
         for _ in range(5):
@@ -332,6 +346,7 @@ class AppointmentOrchestrator:
             "last_offered_slot_ids": [slot.slot_id for slot in state.last_offered_slots],
             "tool_call_count": len(state.tool_calls),
             "emergency_active": state.emergency_active,
+            "last_intent": state.last_intent.model_dump(mode="json") if state.last_intent else None,
         }
 
     @staticmethod
