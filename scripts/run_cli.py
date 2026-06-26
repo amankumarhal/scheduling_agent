@@ -13,7 +13,7 @@ from app.orchestrator import AppointmentOrchestrator  # noqa: E402
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Text CLI demo for the appointment scheduling agent.")
+    parser = argparse.ArgumentParser(description="Text CLI for the appointment scheduling assistant.")
     parser.add_argument("--session-id", default="cli", help="Conversation session ID.")
     parser.add_argument("--debug", action="store_true", help="Show tool calls and state summary.")
     args = parser.parse_args()
@@ -39,4 +39,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

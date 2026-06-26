@@ -4,7 +4,7 @@
 
 Healthcare appointment scheduling is conversational, stateful, and sensitive. A useful assistant must understand a patient's intent, ask for missing information, show empathy, and keep the conversation moving. At the same time, it must not let a language model directly mutate appointments, because booking, cancellation, and rescheduling require validation, auditability, and explicit confirmation.
 
-This project builds a production-style appointment scheduling AI agent that can schedule, reschedule, and cancel demo appointments through text and voice. The goal is to show a clean end-to-end system that is easy to run, explain, test, and extend.
+This project builds a production-style appointment scheduling assistant that can schedule, reschedule, and cancel appointments through text and voice. The current implementation uses sample scheduling data so the system can run locally without connecting to a real scheduling backend.
 
 ## Solution Summary
 
@@ -34,6 +34,60 @@ User text or audio
 -> Response text
 -> Streaming-style UI updates
 -> OpenAI TTS if speech playback is enabled
+```
+
+```mermaid
+flowchart LR
+    User[User] --> Client[Browser UI or CLI]
+    Client -->|Text| API[FastAPI API]
+    Client -->|Audio| Voice[Voice Endpoint]
+    Voice --> STT[OpenAI STT, English]
+    STT --> API
+    API --> Orchestrator[Conversation Orchestrator]
+    Orchestrator --> Model[GPT-5.5 Tool Calling]
+    Model --> Orchestrator
+    Orchestrator --> Tools[Scheduling Tools]
+    Tools --> Store[Appointment Store]
+    Orchestrator --> Logger[Session Logger]
+    Orchestrator --> Sanitizer[Response Sanitizer]
+    Sanitizer --> Client
+    Client -->|Optional spoken reply| TTS[OpenAI TTS]
+```
+
+## Orchestrator Flow
+
+```mermaid
+flowchart TD
+    Start[User message arrives] --> Emergency{Emergency terms detected?}
+    Emergency -->|Yes| EmergencyReply[Return emergency response]
+    Emergency -->|No| State[Load or create session state]
+    State --> Prompt[Build system and conversation messages]
+    Prompt --> LLM[Call GPT-5.5 with tool schemas]
+    LLM --> ToolCheck{Model requested tools?}
+    ToolCheck -->|No| Normalize[Normalize response for voice]
+    Normalize --> LogAssistant[Log assistant event]
+    LogAssistant --> Stream[Stream response to UI]
+    ToolCheck -->|Yes| Validate[Validate tool arguments]
+    Validate --> Execute[Execute deterministic tool]
+    Execute --> LogTool[Log tool event]
+    LogTool --> StateUpdate[Update session state]
+    StateUpdate --> Prompt
+```
+
+## Scheduling Tool Flow
+
+```mermaid
+flowchart TD
+    Intent[Scheduling intent] --> Search[Search available slots]
+    Search --> Offer[Offer available options]
+    Offer --> Hold[Hold selected slot]
+    Hold --> Collect[Collect required patient fields]
+    Collect --> Confirm{Explicit confirmation?}
+    Confirm -->|No| Ask[Ask for confirmation]
+    Confirm -->|Yes| Mutate[Book, cancel, or reschedule]
+    Mutate --> Validate[Validate no double booking]
+    Validate --> Persist[Update appointment store]
+    Persist --> Summary[Return booking summary]
 ```
 
 ## Main Components
@@ -107,7 +161,7 @@ Safety rules:
 
 ### Store
 
-The current backend is an in-memory fake scheduling store with demo data only. This makes the project simple to run in local demos and easy to test without external infrastructure.
+The current backend is an in-memory scheduling store with sample appointment data. This makes the project simple to run locally and easy to test without external infrastructure.
 
 Production replacement options:
 
@@ -146,7 +200,7 @@ Each session writes JSONL events under `logs/sessions`:
 - Assistant messages
 - Tool calls
 
-This is useful for debugging, demos, and technical review. In production, logging would need privacy controls, retention policies, encryption, access controls, and compliance review.
+This is useful for debugging, product review, and technical review. In production, logging would need privacy controls, retention policies, encryption, access controls, and compliance review.
 
 ## Streaming Design
 

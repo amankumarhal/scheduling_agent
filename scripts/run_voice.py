@@ -14,7 +14,7 @@ from app.tts_client import synthesize_speech  # noqa: E402
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Audio-file demo for the appointment scheduling agent.")
+    parser = argparse.ArgumentParser(description="Audio-file runner for the appointment scheduling assistant.")
     parser.add_argument("--audio", required=True, help="Path to an input audio file.")
     parser.add_argument("--out", default="response.mp3", help="Path for generated speech output.")
     parser.add_argument("--session-id", default="voice", help="Conversation session ID.")

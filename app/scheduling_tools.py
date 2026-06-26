@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from app.demo_data import SPECIALTIES
+from app.sample_data import SPECIALTIES
 from app.models import (
     AppointmentBooking,
     AppointmentSlot,
@@ -255,4 +255,3 @@ class SchedulingTools:
             old_slot_id=old_slot_id,
             new_slot=new_slot,
         )
-

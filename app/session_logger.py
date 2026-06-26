@@ -15,7 +15,7 @@ def _safe_session_id(session_id: str) -> str:
 
 
 class SessionLogger:
-    """Append-only JSONL session logger for demo auditing and debugging."""
+    """Append-only JSONL session logger for auditing and debugging."""
 
     def __init__(self, log_dir: str | None = None):
         settings = get_settings()
@@ -32,4 +32,3 @@ class SessionLogger:
         path = self.log_dir / f"{_safe_session_id(session_id)}.jsonl"
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
-

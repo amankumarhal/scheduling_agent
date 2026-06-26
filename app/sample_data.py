@@ -16,7 +16,7 @@ def _next_weekday(days_ahead: int, hour: int, minute: int = 0) -> datetime:
     return base + timedelta(days=days_ahead)
 
 
-def create_demo_slots() -> list[AppointmentSlot]:
+def create_sample_slots() -> list[AppointmentSlot]:
     raw_slots = [
         ("slot_pc_1", "Dr. Maya Patel", "Primary care", "Downtown Clinic", 1, 9, 0),
         ("slot_pc_2", "Dr. Maya Patel", "Primary care", "Downtown Clinic", 2, 14, 0),
@@ -43,4 +43,3 @@ def create_demo_slots() -> list[AppointmentSlot]:
             )
         )
     return slots
-

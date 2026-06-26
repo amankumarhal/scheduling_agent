@@ -235,7 +235,7 @@ def home() -> str:
           <header>
             <div>
               <h1>Appointment Scheduling AI Agent</h1>
-              <div class="sub">Schedule, reschedule, or cancel demo appointments with typed chat or voice.</div>
+              <div class="sub">Schedule, reschedule, or cancel appointments with typed chat or voice.</div>
             </div>
             <div class="status" id="status">Ready</div>
           </header>
@@ -512,14 +512,14 @@ def home() -> str:
           clearButton.addEventListener("click", () => {
             interruptSpeech();
             messages.innerHTML = "";
-            addMessage("assistant", "Hi, I can help schedule, reschedule, or cancel a demo appointment. What would you like to do?");
+            addMessage("assistant", "Hi, I can help schedule, reschedule, or cancel an appointment. What would you like to do?");
           });
           micButton.addEventListener("pointerdown", startRecording);
           micButton.addEventListener("pointerup", stopRecording);
           micButton.addEventListener("pointercancel", stopRecording);
           micButton.addEventListener("pointerleave", stopRecording);
 
-          addMessage("assistant", "Hi, I can help schedule, reschedule, or cancel a demo appointment. What would you like to do?");
+          addMessage("assistant", "Hi, I can help schedule, reschedule, or cancel an appointment. What would you like to do?");
         </script>
       </body>
     </html>

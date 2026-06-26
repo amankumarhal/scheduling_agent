@@ -1,6 +1,6 @@
 # Appointment Scheduling AI Agent
 
-A production-style appointment scheduling agent for booking, rescheduling, and canceling fake demo appointments. The LLM handles conversation, empathy, and deciding what information is missing. Deterministic typed tools handle all scheduling state changes, with validation and explicit confirmation required before booking, cancellation, or rescheduling.
+A production-style appointment scheduling assistant for booking, rescheduling, and canceling appointments using sample scheduling data. The LLM handles conversation, empathy, and deciding what information is missing. Deterministic typed tools handle all scheduling state changes, with validation and explicit confirmation required before booking, cancellation, or rescheduling.
 
 This version intentionally uses OpenAI only:
 
@@ -27,6 +27,38 @@ User text/audio
 
 Core boundary: the model can request tools, but it does not directly mutate appointments. The scheduling tools validate inputs, update state, and return structured outputs.
 
+```mermaid
+flowchart LR
+    U[User] --> UI[Browser UI or CLI]
+    UI -->|Audio| STT[OpenAI STT, English]
+    UI -->|Text| ORCH[Conversation Orchestrator]
+    STT --> ORCH
+    ORCH --> LLM[GPT-5.5 Tool Calling]
+    LLM --> ORCH
+    ORCH --> TOOLS[Deterministic Scheduling Tools]
+    TOOLS --> STORE[Appointment Store]
+    ORCH --> LOGS[Session Logs]
+    ORCH --> CLEAN[Response Sanitizer]
+    CLEAN --> UI
+    UI -->|Speak replies| TTS[OpenAI TTS]
+```
+
+```mermaid
+flowchart TD
+    A[Receive user message] --> B{Emergency language?}
+    B -->|Yes| C[Return emergency response and stop scheduling]
+    B -->|No| D[Load session state]
+    D --> E[Call LLM with scheduling tool schemas]
+    E --> F{Tool call requested?}
+    F -->|No| G[Normalize response for TTS]
+    F -->|Yes| H[Validate tool input with Pydantic]
+    H --> I[Execute deterministic scheduling tool]
+    I --> J[Record tool call and update state]
+    J --> E
+    G --> K[Log assistant response]
+    K --> L[Stream response to UI]
+```
+
 ## Project Layout
 
 ```text
@@ -34,22 +66,28 @@ appointment_agent/
   app/
     api.py
     config.py
-    demo_data.py
     main.py
     models.py
     openai_client.py
     orchestrator.py
     prompts.py
+    sample_data.py
     scheduling_tools.py
+    session_logger.py
     store.py
     stt_client.py
+    text_utils.py
     tts_client.py
+  docs/
+    ARCHITECTURE.md
   scripts/
-    run_cli_demo.py
-    run_voice_demo.py
+    run_cli.py
+    run_voice.py
   tests/
+    test_api.py
     test_orchestrator.py
     test_scheduling_tools.py
+    test_text_utils.py
 ```
 
 ## Setup
@@ -76,17 +114,17 @@ DEBUG=true
 
 If `gpt-5.5` is not available in your account, keep the code unchanged and set `OPENAI_MODEL` to a model your account can use.
 
-## Run The CLI Demo
+## Run The CLI
 
 ```bash
 cd /Users/amankumar/Documents/voice_ai/appointment_agent
 source .venv/bin/activate
-python scripts/run_cli_demo.py --debug
+python scripts/run_cli.py --debug
 ```
 
-The CLI is the primary demo path. It supports typed conversations and optional debug output showing tool calls and state summaries.
+The CLI is a local text interface. It supports typed conversations and optional debug output showing tool calls and state summaries.
 
-## Run The Browser Demo
+## Run The Browser App
 
 ```bash
 cd /Users/amankumar/Documents/voice_ai/appointment_agent
@@ -110,12 +148,12 @@ The browser UI supports:
 - Streaming-style assistant responses
 - Optional tool trace display
 
-## Run The Voice Demo
+## Run The Voice File Runner
 
 ```bash
 cd /Users/amankumar/Documents/voice_ai/appointment_agent
 source .venv/bin/activate
-python scripts/run_voice_demo.py --audio sample.wav --out response.mp3
+python scripts/run_voice.py --audio sample.wav --out response.mp3
 ```
 
 This transcribes an audio file in English, sends the text to the agent, and generates a speech response.
@@ -147,7 +185,7 @@ python -m pytest -q
 
 Tests do not require OpenAI API calls. The orchestrator tests use a mocked OpenAI client.
 
-## Demo Scenarios
+## Example Scenarios
 
 Scenario 1: Happy path
 
@@ -191,16 +229,16 @@ Expected behavior: the agent says exactly: “I’m sorry you’re experiencing 
 - Kept deterministic scheduling logic separate from LLM orchestration.
 - Used Pydantic schemas for validation and readable tool contracts.
 - Required explicit confirmation for booking, cancellation, and rescheduling.
-- Used a fake in-memory scheduling backend with demo-only data.
+- Used an in-memory scheduling backend with sample appointment data.
 - Added rule-based emergency detection before normal LLM scheduling.
 - Isolated OpenAI LLM, STT, and TTS clients so providers can be swapped later.
 - Normalized assistant text so TTS hears full weekday and month names.
-- Logged session events as JSONL for debugging and demo review.
+- Logged session events as JSONL for debugging and technical review.
 
 ## Tradeoffs
 
 - The store is in-memory, so data resets when the process restarts.
-- Date parsing is intentionally simple and demo-friendly.
+- Date parsing is intentionally simple for the sample scheduling data.
 - The CLI and API use the same orchestrator, but there is no authentication.
 - Browser voice uses hold-to-talk audio uploads. Real-time voice transport is deferred.
 - Streaming-style UI currently streams the completed assistant response after tool execution finishes.

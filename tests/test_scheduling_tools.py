@@ -9,7 +9,7 @@ def make_tools() -> SchedulingTools:
 
 def patient() -> dict:
     return PatientInfo(
-        patient_name="Demo Patient",
+        patient_name="Sample Patient",
         date_of_birth="1990-01-01",
         phone_number="555-0100",
     ).model_dump()
@@ -142,4 +142,3 @@ def test_reschedule_moves_booking_to_new_slot() -> None:
     new_slot = tools.store.get_slot("slot_card_2")
     assert old_slot is not None and old_slot.is_available is True
     assert new_slot is not None and new_slot.is_booked is True
-
