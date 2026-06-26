@@ -260,6 +260,7 @@ This allows bookings and slot status to survive a server restart. Session logs a
 ## Documentation
 
 - Architecture writeup: `docs/ARCHITECTURE.md`
+- Code walkthrough: `docs/CODE_WALKTHROUGH.md`
 
 ## Production Improvements
 

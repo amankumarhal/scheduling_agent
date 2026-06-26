@@ -10,6 +10,7 @@ htmlcov/
 logs/
 data/
 docs/*_*.md
+!docs/CODE_WALKTHROUGH.md
 docs/*_deck.pptx
 *.pptx
 .DS_Store
