@@ -9,12 +9,12 @@ sequenceDiagram
     participant User
     participant UI as Browser UI or CLI
     participant API as FastAPI
-    participant STT as OpenAI STT
+    participant STT as Audio STT
     participant Orchestrator
     participant LLM as GPT-5.5
     participant Tools as Scheduling Tools
     participant Store as JSON Store
-    participant TTS as OpenAI TTS
+    participant TTS as Audio TTS
 
     User->>UI: Type message or hold to talk
     UI->>API: Send text or audio
@@ -66,8 +66,9 @@ Important settings:
 
 - `OPENAI_API_KEY` supplies OpenAI authentication.
 - `OPENAI_MODEL` controls the LLM model.
-- `OPENAI_STT_MODEL` controls transcription.
-- `OPENAI_TTS_MODEL`, `OPENAI_TTS_VOICE`, and `OPENAI_TTS_SPEED` control speech output.
+- `AUDIO_STT_PROVIDER` and `AUDIO_TTS_PROVIDER` choose `auto`, `deepgram`, or `openai`.
+- `DEEPGRAM_API_KEY`, `DEEPGRAM_STT_MODEL`, `DEEPGRAM_TTS_MODEL`, and `DEEPGRAM_TTS_ENCODING` control Deepgram audio.
+- `OPENAI_STT_MODEL`, `OPENAI_TTS_MODEL`, `OPENAI_TTS_VOICE`, and `OPENAI_TTS_SPEED` control OpenAI audio.
 - `APPOINTMENT_DATA_DIR` controls where JSON appointment state is stored.
 - `SESSION_LOG_DIR` controls where session logs are written.
 
@@ -165,7 +166,7 @@ It keeps OpenAI SDK details isolated from the orchestrator. If the app later cha
 
 This module handles speech-to-text.
 
-`transcribe_audio()` opens an audio file, sends it to OpenAI transcription, and returns English text. This happens before the orchestrator receives the user input.
+`transcribe_audio()` opens an audio file, sends it to the configured STT provider, and returns English text. This happens before the orchestrator receives the user input.
 
 ### `app/tts_client.py`
 
@@ -173,7 +174,7 @@ This module handles text-to-speech.
 
 `synthesize_speech()` writes speech audio to a file for the voice runner.
 
-`synthesize_speech_bytes()` returns audio bytes for the browser `/speak` endpoint. Both paths use the configured speech speed so browser replies and file replies stay consistent.
+`synthesize_speech_bytes()` returns audio bytes for the browser `/speak` endpoint. The client can use Deepgram or OpenAI depending on configuration, with fallback enabled by default.
 
 ### `app/text_utils.py`
 
@@ -297,7 +298,7 @@ Session logs are append-only records of conversation events. They are separate f
 
 ### English-Only Voice Input
 
-OpenAI transcription is configured with English as the language. The prompt also instructs the assistant to respond only in English.
+Speech transcription is configured with English as the language. The prompt also instructs the assistant to respond only in English.
 
 ### TTS-Friendly Output
 

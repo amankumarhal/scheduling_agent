@@ -11,6 +11,9 @@ def test_root_serves_interactive_ui() -> None:
     assert "Hold to talk" in response.text
     assert "Interrupt" in response.text
     assert "showGreeting({ spoken: true })" in response.text
+    assert 'id="status"' in response.text
+    assert response.text.count('id="status"') == 1
+    assert "shouldSkipDuplicateAssistant" in response.text
 
 
 def test_stream_endpoint_returns_sse() -> None:

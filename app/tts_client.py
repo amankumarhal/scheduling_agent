@@ -1,17 +1,81 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from urllib.error import URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from openai import OpenAI, OpenAIError
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 
 
 def synthesize_speech_bytes(text: str) -> bytes:
     settings = get_settings()
-    if not settings.openai_api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set. Cannot synthesize speech.")
+    providers = _provider_order(settings.audio_tts_provider, settings)
+    errors = []
+    for provider in providers:
+        try:
+            if provider == "deepgram":
+                return _synthesize_with_deepgram(text, settings)
+            if provider == "openai":
+                return _synthesize_with_openai_bytes(text, settings)
+        except RuntimeError as exc:
+            errors.append(str(exc))
+            if not settings.audio_fallback_enabled:
+                break
+    raise RuntimeError("Speech synthesis failed. " + " | ".join(errors))
 
+
+def speech_media_type() -> str:
+    settings = get_settings()
+    provider = (settings.audio_tts_provider or "auto").strip().lower()
+    if provider == "auto" and settings.deepgram_api_key:
+        provider = "deepgram"
+    if provider == "deepgram" and settings.deepgram_tts_encoding.lower() == "wav":
+        return "audio/wav"
+    return "audio/mpeg"
+
+
+def _provider_order(requested_provider: str, settings: Settings) -> list[str]:
+    provider = (requested_provider or "auto").strip().lower()
+    if provider == "auto":
+        primary = "deepgram" if settings.deepgram_api_key else "openai"
+    elif provider in {"deepgram", "openai"}:
+        primary = provider
+    else:
+        raise RuntimeError(f"Unsupported TTS provider: {requested_provider}")
+    fallback = "openai" if primary == "deepgram" else "deepgram"
+    if settings.audio_fallback_enabled:
+        return [primary, fallback]
+    return [primary]
+
+
+def _synthesize_with_deepgram(text: str, settings: Settings) -> bytes:
+    if not settings.deepgram_api_key:
+        raise RuntimeError("DEEPGRAM_API_KEY is not set. Cannot synthesize speech with Deepgram.")
+
+    query = urlencode({"model": settings.deepgram_tts_model, "encoding": settings.deepgram_tts_encoding})
+    request = Request(
+        f"https://api.deepgram.com/v1/speak?{query}",
+        data=json.dumps({"text": text}).encode("utf-8"),
+        headers={
+            "Authorization": f"Token {settings.deepgram_api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=settings.deepgram_timeout_seconds) as response:
+            return response.read()
+    except (OSError, URLError) as exc:
+        raise RuntimeError(f"Deepgram speech synthesis failed: {exc}") from exc
+
+
+def _synthesize_with_openai_bytes(text: str, settings: Settings) -> bytes:
+    if not settings.openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set. Cannot synthesize speech with OpenAI.")
     client = OpenAI(api_key=settings.openai_api_key)
     try:
         with client.audio.speech.with_streaming_response.create(
@@ -27,22 +91,11 @@ def synthesize_speech_bytes(text: str) -> bytes:
 
 def synthesize_speech(text: str, output_path: str) -> str:
     settings = get_settings()
-    if not settings.openai_api_key:
-        print(text)
-        return output_path
-
-    client = OpenAI(api_key=settings.openai_api_key)
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        response = client.audio.speech.create(
-            model=settings.openai_tts_model,
-            voice=settings.openai_tts_voice,
-            input=text,
-            speed=settings.openai_tts_speed,
-        )
-        response.stream_to_file(path)
+        path.write_bytes(synthesize_speech_bytes(text))
         return str(path)
-    except OpenAIError as exc:
+    except RuntimeError:
         print(text)
-        raise RuntimeError(f"OpenAI speech synthesis failed: {exc}") from exc
+        raise

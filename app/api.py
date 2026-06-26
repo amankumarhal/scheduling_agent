@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from app.orchestrator import AppointmentOrchestrator
 from app.stt_client import transcribe_audio
-from app.tts_client import synthesize_speech, synthesize_speech_bytes
+from app.tts_client import speech_media_type, synthesize_speech, synthesize_speech_bytes
 
 app = FastAPI(title="Appointment Scheduling AI Agent")
 agent = AppointmentOrchestrator()
@@ -279,6 +279,9 @@ def home() -> str:
           let mediaStream = null;
           let audioChunks = [];
           let busy = false;
+          let voiceRequestInFlight = false;
+          let lastAssistantText = "";
+          let lastAssistantAt = 0;
 
           function setStatus(text) {
             statusEl.textContent = text;
@@ -305,6 +308,17 @@ def home() -> str:
             details.appendChild(pre);
             messages.appendChild(details);
             messages.scrollTop = messages.scrollHeight;
+          }
+
+          function shouldSkipDuplicateAssistant(text) {
+            const normalized = (text || "").trim();
+            const now = Date.now();
+            if (normalized && normalized === lastAssistantText && now - lastAssistantAt < 8000) {
+              return true;
+            }
+            lastAssistantText = normalized;
+            lastAssistantAt = now;
+            return false;
           }
 
           function setBusy(value) {
@@ -368,6 +382,7 @@ def home() -> str:
           }
 
           async function handleAgentResponse(payload) {
+            if (shouldSkipDuplicateAssistant(payload.message)) return;
             addMessage("assistant", payload.message);
             addToolTrace(payload.tool_calls);
             await speak(payload.message);
@@ -420,6 +435,7 @@ def home() -> str:
 
             if (finalPayload) {
               assistantBubble.textContent = finalPayload.message;
+              shouldSkipDuplicateAssistant(finalPayload.message);
               addToolTrace(finalPayload.tool_calls);
               await speak(finalPayload.message);
             }
@@ -445,6 +461,8 @@ def home() -> str:
           }
 
           async function sendVoice(blob) {
+            if (voiceRequestInFlight) return;
+            voiceRequestInFlight = true;
             interruptSpeech();
             setBusy(true);
             setStatus("Transcribing...");
@@ -466,6 +484,7 @@ def home() -> str:
             } catch (error) {
               addMessage("system", `Voice request failed: ${error.message}`);
             } finally {
+              voiceRequestInFlight = false;
               setBusy(false);
               setStatus("Ready");
               input.focus();
@@ -570,7 +589,7 @@ def speak(request: SpeakRequest) -> Response:
         audio = synthesize_speech_bytes(request.text)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return Response(content=audio, media_type="audio/mpeg")
+    return Response(content=audio, media_type=speech_media_type())
 
 
 @app.post("/voice")

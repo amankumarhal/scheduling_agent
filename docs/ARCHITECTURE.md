@@ -24,7 +24,7 @@ Core principles:
 ```text
 User text or audio
 -> Browser UI or CLI
--> OpenAI STT if audio
+-> Deepgram or OpenAI STT if audio
 -> Conversation Orchestrator
 -> GPT-5.5 with tool calling
 -> Deterministic scheduling tools
@@ -33,7 +33,7 @@ User text or audio
 -> Session logger
 -> Response text
 -> Streaming-style UI updates
--> OpenAI TTS if speech playback is enabled
+-> Deepgram or OpenAI TTS if speech playback is enabled
 ```
 
 ```mermaid
@@ -41,7 +41,7 @@ flowchart LR
     User[User] --> Client[Browser UI or CLI]
     Client -->|Text| API[FastAPI API]
     Client -->|Audio| Voice[Voice Endpoint]
-    Voice --> STT[OpenAI STT, English]
+    Voice --> STT[Deepgram or OpenAI STT, English]
     STT --> API
     API --> Orchestrator[Conversation Orchestrator]
     Orchestrator --> Model[GPT-5.5 Tool Calling]
@@ -51,7 +51,7 @@ flowchart LR
     Orchestrator --> Logger[Session Logger]
     Orchestrator --> Sanitizer[Response Sanitizer]
     Sanitizer --> Client
-    Client -->|Optional spoken reply| TTS[OpenAI TTS]
+    Client -->|Optional spoken reply| TTS[Deepgram or OpenAI TTS]
 ```
 
 ## Orchestrator Flow
@@ -177,15 +177,15 @@ Production replacement options:
 - Appointment hold service with expiration
 - Durable audit log
 
-### OpenAI Clients
+### Provider Clients
 
-OpenAI usage is isolated behind small adapters:
+Provider usage is isolated behind small adapters:
 
 - `openai_client.py` for LLM calls
-- `stt_client.py` for transcription
-- `tts_client.py` for speech generation
+- `stt_client.py` for Deepgram or OpenAI transcription
+- `tts_client.py` for Deepgram or OpenAI speech generation
 
-This keeps provider details away from business logic. Later, STT or TTS can be replaced without rewriting the orchestrator.
+This keeps provider details away from business logic. STT or TTS can be replaced without rewriting the orchestrator.
 
 ### Text Normalization
 
