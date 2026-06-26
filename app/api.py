@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from fastapi import FastAPI, File, Form, UploadFile
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from app.orchestrator import AppointmentOrchestrator
@@ -17,6 +18,66 @@ agent = AppointmentOrchestrator()
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
+
+
+@app.get("/", response_class=HTMLResponse)
+def home() -> str:
+    return """
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Appointment Scheduling AI Agent</title>
+        <style>
+          body {
+            margin: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: #1f2937;
+            background: #f8fafc;
+          }
+          main {
+            max-width: 760px;
+            margin: 56px auto;
+            padding: 0 24px;
+          }
+          h1 {
+            font-size: 32px;
+            margin-bottom: 8px;
+          }
+          p {
+            line-height: 1.55;
+          }
+          code {
+            background: #e5e7eb;
+            padding: 2px 6px;
+            border-radius: 6px;
+          }
+          .links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 24px;
+          }
+          a {
+            color: #0f766e;
+            font-weight: 650;
+          }
+        </style>
+      </head>
+      <body>
+        <main>
+          <h1>Appointment Scheduling AI Agent</h1>
+          <p>The FastAPI server is running. Use the API docs to try chat requests from your browser.</p>
+          <p>Available endpoints: <code>GET /health</code>, <code>POST /chat</code>, and <code>POST /voice</code>.</p>
+          <div class="links">
+            <a href="/docs">Open API Docs</a>
+            <a href="/health">Health Check</a>
+          </div>
+        </main>
+      </body>
+    </html>
+    """
 
 
 @app.get("/health")
@@ -52,4 +113,3 @@ async def voice(
         "response": response.model_dump(mode="json"),
         "tts_output_path": output_path,
     }
-
