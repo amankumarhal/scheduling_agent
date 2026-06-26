@@ -373,6 +373,14 @@ def home() -> str:
             await speak(payload.message);
           }
 
+          async function showGreeting(options = { spoken: false }) {
+            const greeting = "Hi, I can help schedule, reschedule, or cancel an appointment. What would you like to do?";
+            addMessage("assistant", greeting);
+            if (options.spoken) {
+              await speak(greeting);
+            }
+          }
+
           async function handleStreamingChat(text) {
             const assistantBubble = addMessage("assistant", "");
             let finalPayload = null;
@@ -512,14 +520,14 @@ def home() -> str:
           clearButton.addEventListener("click", () => {
             interruptSpeech();
             messages.innerHTML = "";
-            addMessage("assistant", "Hi, I can help schedule, reschedule, or cancel an appointment. What would you like to do?");
+            showGreeting({ spoken: false });
           });
           micButton.addEventListener("pointerdown", startRecording);
           micButton.addEventListener("pointerup", stopRecording);
           micButton.addEventListener("pointercancel", stopRecording);
           micButton.addEventListener("pointerleave", stopRecording);
 
-          addMessage("assistant", "Hi, I can help schedule, reschedule, or cancel an appointment. What would you like to do?");
+          showGreeting({ spoken: true });
         </script>
       </body>
     </html>
