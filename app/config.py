@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     openai_stt_model: str = Field(default="gpt-4o-mini-transcribe", alias="OPENAI_STT_MODEL")
     openai_tts_model: str = Field(default="gpt-4o-mini-tts", alias="OPENAI_TTS_MODEL")
     openai_tts_voice: str = Field(default="alloy", alias="OPENAI_TTS_VOICE")
+    openai_tts_speed: float = Field(default=1.25, ge=0.25, le=4.0, alias="OPENAI_TTS_SPEED")
     session_log_dir: str = Field(default="logs/sessions", alias="SESSION_LOG_DIR")
     appointment_data_dir: str = Field(default="data", alias="APPOINTMENT_DATA_DIR")
     debug: bool = Field(default=False, alias="DEBUG")

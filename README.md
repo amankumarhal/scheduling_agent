@@ -110,6 +110,7 @@ OPENAI_MODEL=gpt-5.5
 OPENAI_STT_MODEL=gpt-4o-mini-transcribe
 OPENAI_TTS_MODEL=gpt-4o-mini-tts
 OPENAI_TTS_VOICE=alloy
+OPENAI_TTS_SPEED=1.25
 SESSION_LOG_DIR=logs/sessions
 APPOINTMENT_DATA_DIR=data
 DEBUG=true
@@ -147,6 +148,7 @@ The browser UI supports:
 - Hold-to-talk microphone input
 - English-only OpenAI transcription
 - Spoken replies through OpenAI TTS
+- Faster spoken replies with configurable `OPENAI_TTS_SPEED`
 - Interrupt button for speech playback
 - Streaming-style assistant responses
 - Optional tool trace display
@@ -238,6 +240,7 @@ Expected behavior: the agent says exactly: “I’m sorry you’re experiencing 
 - Added fuzzy provider lookup so a doctor name can take priority over a conflicting specialty.
 - Isolated OpenAI LLM, STT, and TTS clients so providers can be swapped later.
 - Normalized assistant text so TTS hears full weekday and month names.
+- Set TTS speed through configuration so spoken responses are brisk but still clear.
 - Logged session events as JSONL for debugging and technical review.
 
 ## Local Persistence

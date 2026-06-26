@@ -67,7 +67,7 @@ Important settings:
 - `OPENAI_API_KEY` supplies OpenAI authentication.
 - `OPENAI_MODEL` controls the LLM model.
 - `OPENAI_STT_MODEL` controls transcription.
-- `OPENAI_TTS_MODEL` and `OPENAI_TTS_VOICE` control speech output.
+- `OPENAI_TTS_MODEL`, `OPENAI_TTS_VOICE`, and `OPENAI_TTS_SPEED` control speech output.
 - `APPOINTMENT_DATA_DIR` controls where JSON appointment state is stored.
 - `SESSION_LOG_DIR` controls where session logs are written.
 
@@ -171,7 +171,7 @@ This module handles text-to-speech.
 
 `synthesize_speech()` writes speech audio to a file for the voice runner.
 
-`synthesize_speech_bytes()` returns audio bytes for the browser `/speak` endpoint.
+`synthesize_speech_bytes()` returns audio bytes for the browser `/speak` endpoint. Both paths use the configured speech speed so browser replies and file replies stay consistent.
 
 ### `app/text_utils.py`
 

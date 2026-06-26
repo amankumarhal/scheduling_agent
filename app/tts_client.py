@@ -18,6 +18,7 @@ def synthesize_speech_bytes(text: str) -> bytes:
             model=settings.openai_tts_model,
             voice=settings.openai_tts_voice,
             input=text,
+            speed=settings.openai_tts_speed,
         ) as response:
             return response.read()
     except OpenAIError as exc:
@@ -38,6 +39,7 @@ def synthesize_speech(text: str, output_path: str) -> str:
             model=settings.openai_tts_model,
             voice=settings.openai_tts_voice,
             input=text,
+            speed=settings.openai_tts_speed,
         )
         response.stream_to_file(path)
         return str(path)

@@ -8,11 +8,15 @@ The system is a simple voice-enabled scheduling assistant. A user can send text 
 
 The goal is to keep the system fast, explainable, and easy to operate locally. OpenAI handles STT, TTS, and the LLM. Scheduling state is handled by typed Python tools and a local JSON-backed store.
 
+Booking IDs use a compact `BK` prefix with no underscore so they are easier to read and speak.
+
 ## Latency Choices
 
 Urgency detection runs before the LLM using regex patterns. This keeps urgent routing fast because the system does not wait for a model call before telling the user to call 911.
 
 The urgent pattern list includes high-signal phrases such as chest pain, trouble breathing, severe bleeding, stroke symptoms, suicidal language, excruciating pain, serious falls, injuries, and accidents.
+
+Speech output uses OpenAI's configurable TTS speed setting. The default is `1.25`, which makes the assistant speak faster while keeping responses understandable.
 
 ## User Information
 
