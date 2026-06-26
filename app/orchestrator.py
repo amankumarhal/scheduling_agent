@@ -75,6 +75,14 @@ def is_emergency_clarification(text: str) -> bool:
     )
 
 
+def is_non_emergency_symptom_context(text: str) -> bool:
+    """Detect symptom or minor-injury context that should route to scheduling, not advice."""
+    lowered = text.lower()
+    symptom_pattern = r"\b(injured|injury|broken|bone|pain|hurt|hurts)\b"
+    scheduling_pattern = r"\b(appointment|schedule|book|primary care|cardiology|dermatology|pediatrics|physical therapy|doctor)\b"
+    return bool(re.search(symptom_pattern, lowered)) and not bool(re.search(scheduling_pattern, lowered))
+
+
 def _schema(
     name: str,
     description: str,
@@ -236,6 +244,14 @@ class AppointmentOrchestrator:
             return self._record_assistant_response(state, EMERGENCY_RESPONSE)
         if state.emergency_active and is_emergency_clarification(message):
             state.emergency_active = False
+
+        if is_non_emergency_symptom_context(message):
+            self.session_logger.log(session_id, "user", {"message": message})
+            safe_response = (
+                "I’m sorry you’re dealing with that. I can help schedule an appointment. "
+                "Would you like to look for primary care, or another specialty?"
+            )
+            return self._record_assistant_response(state, safe_response)
 
         state.messages.append({"role": "user", "content": message})
         self.session_logger.log(

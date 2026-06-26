@@ -152,6 +152,20 @@ def test_just_kidding_clarification_resumes_scheduling() -> None:
     assert mock.calls == 1
 
 
+def test_non_emergency_injury_context_does_not_get_medical_advice() -> None:
+    mock = MockOpenAIClient([assistant_response("This should not be called.")])
+    agent = AppointmentOrchestrator(openai_client=mock)
+    response = agent.handle_message(
+        "I just got injured on my right hand which is a broken bone.",
+        session_id="minor-injury-context",
+    )
+
+    assert "I can help schedule an appointment" in response.message
+    assert "primary care" in response.message
+    assert response.state_summary["emergency_active"] is False
+    assert mock.calls == 0
+
+
 def test_orchestrator_normalizes_tts_unfriendly_output() -> None:
     mock = MockOpenAIClient([assistant_response("Fri, Jun 26 \u2014 9:00\u20139:30 AM works.")])
     agent = AppointmentOrchestrator(openai_client=mock)
