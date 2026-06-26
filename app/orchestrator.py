@@ -276,12 +276,15 @@ class AppointmentOrchestrator:
                 result = self.tools.get_booking(**arguments)
                 if result.get("success"):
                     state.pending_booking_id = arguments.get("booking_id")
+                result.pop("booking", None)
                 return result
             if name == "search_bookings_by_phone":
                 result = self.tools.search_bookings_by_phone(**arguments)
                 if result.success and len(result.bookings) == 1:
                     state.pending_booking_id = result.bookings[0].booking_id
-                return result.model_dump(mode="json")
+                output = result.model_dump(mode="json")
+                output.pop("bookings", None)
+                return output
             if name == "cancel_appointment":
                 result = self.tools.cancel_appointment(**arguments)
                 if result.success:
