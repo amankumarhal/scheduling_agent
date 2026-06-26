@@ -81,7 +81,7 @@ def _synthesize_with_cartesia(text: str, settings: Settings) -> bytes:
             }
         ).encode("utf-8"),
         headers={
-            "Authorization": f"Bearer {settings.cartesia_api_key}",
+            "X-API-Key": settings.cartesia_api_key,
             "Cartesia-Version": settings.cartesia_api_version,
             "Content-Type": "application/json",
         },

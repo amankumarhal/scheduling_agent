@@ -74,7 +74,7 @@ def test_cartesia_tts_returns_audio_bytes(monkeypatch) -> None:
 
     def stub_urlopen(request, timeout):
         assert request.full_url == "https://api.cartesia.ai/tts/bytes"
-        assert request.headers["Authorization"] == "Bearer cartesia_test"
+        assert request.headers["X-api-key"] == "cartesia_test"
         assert "Cartesia-version" in request.headers
         body = json.loads(request.data.decode("utf-8"))
         assert body["transcript"] == "Hello"
