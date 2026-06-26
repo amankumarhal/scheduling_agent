@@ -6,7 +6,7 @@ This file captures the current design thinking for the appointment scheduling as
 
 The system is a simple voice-enabled scheduling assistant. A user can send text or audio, and audio is transcribed to English before the message reaches the orchestrator. The orchestrator then uses one LLM conversation loop plus deterministic scheduling tools for booking, cancellation, rescheduling, and lookup.
 
-The goal is to keep the system fast, explainable, and easy to operate locally. OpenAI handles the LLM, while audio can use Deepgram or OpenAI by configuration. Scheduling state is handled by typed Python tools and a local JSON-backed store.
+The goal is to keep the system fast, explainable, and easy to operate locally. OpenAI handles the LLM, while audio can use Deepgram, Cartesia, or OpenAI by configuration. Scheduling state is handled by typed Python tools and a local JSON-backed store.
 
 Booking reference numbers use digits only so they are easier to hear and repeat in a voice conversation.
 
@@ -20,7 +20,7 @@ The urgent pattern list includes high-signal phrases such as chest pain, trouble
 
 Speech output uses OpenAI's configurable TTS speed setting. The default is `1.25`, which makes the assistant speak faster while keeping responses understandable.
 
-Audio provider selection uses `auto`, `deepgram`, or `openai`. In `auto`, Deepgram is preferred when its key exists, and OpenAI remains available as fallback.
+Audio provider selection uses `auto`, `deepgram`, `cartesia`, or `openai`. In `auto`, Cartesia is preferred for TTS when its key exists, then Deepgram, then OpenAI.
 
 Slot search understands simple relative dates like today and tomorrow. If a preferred date or time has no exact match, the tool returns the soonest alternatives in the same result so the assistant can offer them immediately.
 

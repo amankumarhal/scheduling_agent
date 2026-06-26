@@ -33,7 +33,7 @@ User text or audio
 -> Session logger
 -> Response text
 -> Streaming-style UI updates
--> Deepgram or OpenAI TTS if speech playback is enabled
+-> Cartesia, Deepgram, or OpenAI TTS if speech playback is enabled
 ```
 
 ```mermaid
@@ -51,7 +51,7 @@ flowchart LR
     Orchestrator --> Logger[Session Logger]
     Orchestrator --> Sanitizer[Response Sanitizer]
     Sanitizer --> Client
-    Client -->|Optional spoken reply| TTS[Deepgram or OpenAI TTS]
+    Client -->|Optional spoken reply| TTS[Cartesia, Deepgram, or OpenAI TTS]
 ```
 
 ## Orchestrator Flow
@@ -183,7 +183,7 @@ Provider usage is isolated behind small adapters:
 
 - `openai_client.py` for LLM calls
 - `stt_client.py` for Deepgram or OpenAI transcription
-- `tts_client.py` for Deepgram or OpenAI speech generation
+- `tts_client.py` for Cartesia, Deepgram, or OpenAI speech generation
 
 This keeps provider details away from business logic. STT or TTS can be replaced without rewriting the orchestrator.
 

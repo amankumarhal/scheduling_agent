@@ -17,6 +17,8 @@ def synthesize_speech_bytes(text: str) -> bytes:
     errors = []
     for provider in providers:
         try:
+            if provider == "cartesia":
+                return _synthesize_with_cartesia(text, settings)
             if provider == "deepgram":
                 return _synthesize_with_deepgram(text, settings)
             if provider == "openai":
@@ -31,8 +33,10 @@ def synthesize_speech_bytes(text: str) -> bytes:
 def speech_media_type() -> str:
     settings = get_settings()
     provider = (settings.audio_tts_provider or "auto").strip().lower()
-    if provider == "auto" and settings.deepgram_api_key:
-        provider = "deepgram"
+    if provider == "auto":
+        provider = _provider_order("auto", settings)[0]
+    if provider == "cartesia" and settings.cartesia_tts_container.lower() == "wav":
+        return "audio/wav"
     if provider == "deepgram" and settings.deepgram_tts_encoding.lower() == "wav":
         return "audio/wav"
     return "audio/mpeg"
@@ -41,15 +45,53 @@ def speech_media_type() -> str:
 def _provider_order(requested_provider: str, settings: Settings) -> list[str]:
     provider = (requested_provider or "auto").strip().lower()
     if provider == "auto":
-        primary = "deepgram" if settings.deepgram_api_key else "openai"
-    elif provider in {"deepgram", "openai"}:
+        if settings.cartesia_api_key:
+            primary = "cartesia"
+        elif settings.deepgram_api_key:
+            primary = "deepgram"
+        else:
+            primary = "openai"
+    elif provider in {"cartesia", "deepgram", "openai"}:
         primary = provider
     else:
         raise RuntimeError(f"Unsupported TTS provider: {requested_provider}")
-    fallback = "openai" if primary == "deepgram" else "deepgram"
+    fallback_order = [item for item in ["cartesia", "deepgram", "openai"] if item != primary]
     if settings.audio_fallback_enabled:
-        return [primary, fallback]
+        return [primary, *fallback_order]
     return [primary]
+
+
+def _synthesize_with_cartesia(text: str, settings: Settings) -> bytes:
+    if not settings.cartesia_api_key:
+        raise RuntimeError("CARTESIA_API_KEY is not set. Cannot synthesize speech with Cartesia.")
+
+    output_format = {"container": settings.cartesia_tts_container}
+    if settings.cartesia_tts_container.lower() == "wav":
+        output_format["encoding"] = settings.cartesia_tts_encoding
+        output_format["sample_rate"] = settings.cartesia_tts_sample_rate
+
+    request = Request(
+        "https://api.cartesia.ai/tts/bytes",
+        data=json.dumps(
+            {
+                "model_id": settings.cartesia_tts_model,
+                "transcript": text,
+                "voice": {"mode": "id", "id": settings.cartesia_tts_voice_id},
+                "output_format": output_format,
+            }
+        ).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {settings.cartesia_api_key}",
+            "Cartesia-Version": settings.cartesia_api_version,
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=settings.cartesia_timeout_seconds) as response:
+            return response.read()
+    except (OSError, URLError) as exc:
+        raise RuntimeError(f"Cartesia speech synthesis failed: {exc}") from exc
 
 
 def _synthesize_with_deepgram(text: str, settings: Settings) -> bytes:

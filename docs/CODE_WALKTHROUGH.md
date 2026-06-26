@@ -66,8 +66,10 @@ Important settings:
 
 - `OPENAI_API_KEY` supplies OpenAI authentication.
 - `OPENAI_MODEL` controls the LLM model.
-- `AUDIO_STT_PROVIDER` and `AUDIO_TTS_PROVIDER` choose `auto`, `deepgram`, or `openai`.
+- `AUDIO_STT_PROVIDER` chooses `auto`, `deepgram`, or `openai`.
+- `AUDIO_TTS_PROVIDER` chooses `auto`, `cartesia`, `deepgram`, or `openai`.
 - `DEEPGRAM_API_KEY`, `DEEPGRAM_STT_MODEL`, `DEEPGRAM_TTS_MODEL`, and `DEEPGRAM_TTS_ENCODING` control Deepgram audio.
+- `CARTESIA_API_KEY`, `CARTESIA_TTS_MODEL`, `CARTESIA_TTS_VOICE_ID`, and `CARTESIA_TTS_CONTAINER` control Cartesia speech output.
 - `OPENAI_STT_MODEL`, `OPENAI_TTS_MODEL`, `OPENAI_TTS_VOICE`, and `OPENAI_TTS_SPEED` control OpenAI audio.
 - `APPOINTMENT_DATA_DIR` controls where JSON appointment state is stored.
 - `SESSION_LOG_DIR` controls where session logs are written.
@@ -174,7 +176,7 @@ This module handles text-to-speech.
 
 `synthesize_speech()` writes speech audio to a file for the voice runner.
 
-`synthesize_speech_bytes()` returns audio bytes for the browser `/speak` endpoint. The client can use Deepgram or OpenAI depending on configuration, with fallback enabled by default.
+`synthesize_speech_bytes()` returns audio bytes for the browser `/speak` endpoint. The client can use Cartesia, Deepgram, or OpenAI depending on configuration, with fallback enabled by default.
 
 ### `app/text_utils.py`
 

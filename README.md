@@ -2,12 +2,12 @@
 
 A production-style appointment scheduling assistant for booking, rescheduling, and canceling appointments using sample scheduling data. The LLM handles conversation, empathy, and deciding what information is missing. Deterministic typed tools handle all scheduling state changes, with validation and explicit confirmation required before booking, cancellation, or rescheduling.
 
-This version keeps the LLM on OpenAI and lets audio use either Deepgram or OpenAI:
+This version keeps the LLM on OpenAI and lets audio use Deepgram, Cartesia, or OpenAI:
 
 - LLM: `gpt-5.5` by default
 - STT: Deepgram or OpenAI transcription
-- TTS: Deepgram or OpenAI speech
-- No LangChain, LangGraph, LiveKit, Pipecat, or Cartesia
+- TTS: Cartesia, Deepgram, or OpenAI speech
+- No LangChain, LangGraph, LiveKit, or Pipecat
 - Browser UI with typed chat, hold-to-talk voice, TTS playback, interruption, and streaming-style responses
 
 ## Architecture
@@ -22,7 +22,7 @@ User text/audio
 -> Session logger
 -> Response text
 -> Streaming browser UI
--> Deepgram or OpenAI TTS if voice
+-> Cartesia, Deepgram, or OpenAI TTS if voice
 ```
 
 Core boundary: the model can request tools, but it does not directly mutate appointments. The scheduling tools validate inputs, update state, and return structured outputs.
@@ -42,7 +42,7 @@ flowchart LR
     ORCH --> LOGS[Session Logs]
     ORCH --> CLEAN[Response Sanitizer]
     CLEAN --> UI
-    UI -->|Speak replies| TTS[Deepgram or OpenAI TTS]
+    UI -->|Speak replies| TTS[Cartesia, Deepgram, or OpenAI TTS]
 ```
 
 ```mermaid
@@ -118,6 +118,13 @@ DEEPGRAM_API_KEY=your_deepgram_key
 DEEPGRAM_STT_MODEL=nova-3
 DEEPGRAM_TTS_MODEL=aura-2-thalia-en
 DEEPGRAM_TTS_ENCODING=mp3
+CARTESIA_API_KEY=your_cartesia_key
+CARTESIA_API_VERSION=2026-03-01
+CARTESIA_TTS_MODEL=sonic-3.5
+CARTESIA_TTS_VOICE_ID=694f9389-aac1-45b6-b726-9d9369183238
+CARTESIA_TTS_CONTAINER=wav
+CARTESIA_TTS_ENCODING=pcm_f32le
+CARTESIA_TTS_SAMPLE_RATE=44100
 SESSION_LOG_DIR=logs/sessions
 APPOINTMENT_DATA_DIR=data
 DEBUG=true
@@ -125,7 +132,9 @@ DEBUG=true
 
 If `gpt-5.5` is not available in your account, keep the code unchanged and set `OPENAI_MODEL` to a model your account can use.
 
-For audio, set `AUDIO_STT_PROVIDER` and `AUDIO_TTS_PROVIDER` to `auto`, `deepgram`, or `openai`. In `auto`, Deepgram is used when `DEEPGRAM_API_KEY` is set, with OpenAI as fallback when enabled.
+For STT, set `AUDIO_STT_PROVIDER` to `auto`, `deepgram`, or `openai`.
+
+For TTS, set `AUDIO_TTS_PROVIDER` to `auto`, `cartesia`, `deepgram`, or `openai`. In `auto`, Cartesia is used first when `CARTESIA_API_KEY` exists, then Deepgram when `DEEPGRAM_API_KEY` exists, then OpenAI. For a clear Cartesia latency test, set `AUDIO_TTS_PROVIDER=cartesia`.
 
 ## Run The CLI
 
@@ -290,7 +299,7 @@ This allows bookings and slot status to survive a server restart. Session logs a
 - Audit logging
 - Human handoff
 - Streaming STT/TTS
-- Cartesia or other low-latency TTS provider
+- Streaming Cartesia TTS or another low-latency TTS path
 - Additional low-latency STT provider options
 - LiveKit/Pipecat for real-time voice transport
 - Observability and tracing
