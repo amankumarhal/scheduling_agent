@@ -18,6 +18,8 @@ from app.models import (
     HoldSlotOutput,
     RescheduleAppointmentInput,
     RescheduleAppointmentOutput,
+    SearchBookingsByPhoneInput,
+    SearchBookingsByPhoneOutput,
     SearchSlotsInput,
     SearchSlotsOutput,
 )
@@ -26,6 +28,10 @@ from app.store import InMemoryAppointmentStore
 
 def _normalize(value: str | None) -> str:
     return (value or "").strip().lower()
+
+
+def _digits_only(value: str | None) -> str:
+    return "".join(ch for ch in (value or "") if ch.isdigit())
 
 
 def _time_window_matches(slot: AppointmentSlot, preferred_time_window: str | None) -> bool:
@@ -167,6 +173,48 @@ class SchedulingTools:
         if not booking:
             return {"success": False, "message": "Booking not found.", "booking": None}
         return {"success": True, "message": "Booking found.", "booking": booking.model_dump(mode="json")}
+
+    def search_bookings_by_phone(
+        self,
+        phone_number: str,
+        include_canceled: bool = False,
+    ) -> SearchBookingsByPhoneOutput:
+        try:
+            data = SearchBookingsByPhoneInput(phone_number=phone_number, include_canceled=include_canceled)
+        except ValidationError as exc:
+            return SearchBookingsByPhoneOutput(
+                success=False,
+                message=f"Invalid booking lookup input: {exc.errors()}",
+            )
+
+        requested_phone = _digits_only(data.phone_number)
+        if len(requested_phone) < 7:
+            return SearchBookingsByPhoneOutput(
+                success=False,
+                message="Please provide a valid phone number with at least seven digits.",
+            )
+
+        matches = []
+        for booking in self.store.list_bookings():
+            booking_phone = _digits_only(booking.patient_info.phone_number)
+            if booking_phone != requested_phone:
+                continue
+            if booking.status == BookingStatus.canceled and not data.include_canceled:
+                continue
+            matches.append(booking)
+
+        if not matches:
+            return SearchBookingsByPhoneOutput(
+                success=True,
+                message="No scheduled appointments were found for that phone number.",
+                bookings=[],
+            )
+
+        return SearchBookingsByPhoneOutput(
+            success=True,
+            message=f"Found {len(matches)} appointment(s) for that phone number.",
+            bookings=matches,
+        )
 
     def cancel_appointment(
         self,

@@ -147,6 +147,7 @@ Tools:
 - `hold_slot`
 - `book_appointment`
 - `get_booking`
+- `search_bookings_by_phone`
 - `cancel_appointment`
 - `reschedule_appointment`
 
@@ -157,6 +158,7 @@ Safety rules:
 - Cancellation requires explicit confirmation.
 - Rescheduling requires explicit confirmation.
 - The same slot cannot be double-booked.
+- Existing appointments can be retrieved by booking ID or phone number.
 - Tool errors are structured and controlled.
 
 ### Store

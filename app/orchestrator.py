@@ -113,6 +113,18 @@ OPENAI_TOOLS = [
         ["booking_id"],
     ),
     _schema(
+        "search_bookings_by_phone",
+        "Look up already scheduled appointments by patient phone number. Call only when the user asks about an existing appointment, cancellation, or rescheduling and does not have a booking ID.",
+        {
+            "phone_number": {"type": "string"},
+            "include_canceled": {
+                "type": "boolean",
+                "description": "Whether to include canceled appointments in the lookup. Use false unless the user asks for canceled appointment history.",
+            },
+        },
+        ["phone_number", "include_canceled"],
+    ),
+    _schema(
         "cancel_appointment",
         "Cancel an appointment only after explicit user confirmation.",
         {
@@ -245,6 +257,11 @@ class AppointmentOrchestrator:
                 if result.get("success"):
                     state.pending_booking_id = arguments.get("booking_id")
                 return result
+            if name == "search_bookings_by_phone":
+                result = self.tools.search_bookings_by_phone(**arguments)
+                if result.success and len(result.bookings) == 1:
+                    state.pending_booking_id = result.bookings[0].booking_id
+                return result.model_dump(mode="json")
             if name == "cancel_appointment":
                 result = self.tools.cancel_appointment(**arguments)
                 if result.success:

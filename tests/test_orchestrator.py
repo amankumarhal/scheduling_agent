@@ -1,5 +1,7 @@
 from app.orchestrator import AppointmentOrchestrator
 from app.prompts import EMERGENCY_RESPONSE, SYSTEM_PROMPT
+from app.scheduling_tools import SchedulingTools
+from app.store import InMemoryAppointmentStore
 
 
 class MockOpenAIClient:
@@ -25,6 +27,26 @@ class MockOpenAIClient:
 
 def assistant_response(content: str) -> dict:
     return {"choices": [{"message": {"role": "assistant", "content": content}}]}
+
+
+def tool_call_response(tool_name: str, arguments: str) -> dict:
+    return {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_lookup",
+                            "type": "function",
+                            "function": {"name": tool_name, "arguments": arguments},
+                        }
+                    ],
+                }
+            }
+        ]
+    }
 
 
 def test_orchestrator_asks_for_missing_info_instead_of_hallucinating() -> None:
@@ -70,3 +92,26 @@ def test_orchestrator_normalizes_tts_unfriendly_output() -> None:
     agent = AppointmentOrchestrator(openai_client=mock)
     response = agent.handle_message("Show me a time.", session_id="normalize")
     assert response.message == "Friday, June 26, 9:00 to 9:30 AM works."
+
+
+def test_orchestrator_can_lookup_existing_booking_by_phone() -> None:
+    store = InMemoryAppointmentStore()
+    patient = {"patient_name": "Sample Patient", "date_of_birth": "1990-01-01", "phone_number": "555-0100"}
+    booking = SchedulingTools(store).book_appointment("slot_card_1", patient, "Follow-up", True).booking
+    assert booking is not None
+    mock = MockOpenAIClient(
+        [
+            tool_call_response(
+                "search_bookings_by_phone",
+                '{"phone_number":"555-0100","include_canceled":false}',
+            ),
+            assistant_response(f"I found your scheduled appointment. Booking ID: {booking.booking_id}"),
+        ]
+    )
+    agent = AppointmentOrchestrator(openai_client=mock, store=store)
+
+    response = agent.handle_message("Can you find my already scheduled appointment? My phone is 555-0100.")
+
+    assert response.tool_calls[0].tool_name == "search_bookings_by_phone"
+    assert response.tool_calls[0].output["bookings"][0]["booking_id"] == booking.booking_id
+    assert booking.booking_id in response.message

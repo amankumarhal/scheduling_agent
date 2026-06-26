@@ -34,6 +34,9 @@ class InMemoryAppointmentStore:
     def get_booking(self, booking_id: str) -> AppointmentBooking | None:
         return self.bookings.get(booking_id)
 
+    def list_bookings(self) -> list[AppointmentBooking]:
+        return list(self.bookings.values())
+
     def save_booking(self, booking: AppointmentBooking) -> AppointmentBooking:
         self.bookings[booking.booking_id] = booking
         return booking

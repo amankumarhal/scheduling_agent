@@ -231,6 +231,7 @@ Expected behavior: the agent says exactly: “I’m sorry you’re experiencing 
 - Used Pydantic schemas for validation and readable tool contracts.
 - Required explicit confirmation for booking, cancellation, and rescheduling.
 - Used a JSON-backed local scheduling store with sample appointment data.
+- Added existing appointment lookup by booking ID or patient phone number.
 - Added rule-based emergency detection before normal LLM scheduling.
 - Isolated OpenAI LLM, STT, and TTS clients so providers can be swapped later.
 - Normalized assistant text so TTS hears full weekday and month names.
@@ -256,6 +257,7 @@ This allows bookings and slot status to survive a server restart. Session logs a
 - Browser voice uses hold-to-talk audio uploads. Real-time voice transport is deferred.
 - Streaming-style UI currently streams the completed assistant response after tool execution finishes.
 - Emergency handling is keyword-based and conservative.
+- Phone lookup is intended for existing appointment information, cancellation, and rescheduling support. A production system would add authentication before showing appointment details.
 
 ## Documentation
 

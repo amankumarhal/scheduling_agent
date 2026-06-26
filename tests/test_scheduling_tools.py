@@ -121,6 +121,33 @@ def test_cancel_marks_appointment_canceled() -> None:
     assert slot.is_available is True
 
 
+def test_search_bookings_by_phone_returns_scheduled_appointments() -> None:
+    tools = make_tools()
+    booking = tools.book_appointment("slot_card_1", patient(), "Follow-up", True).booking
+    assert booking is not None
+
+    result = tools.search_bookings_by_phone("5550100")
+
+    assert result.success is True
+    assert len(result.bookings) == 1
+    assert result.bookings[0].booking_id == booking.booking_id
+
+
+def test_search_bookings_by_phone_ignores_canceled_by_default() -> None:
+    tools = make_tools()
+    booking = tools.book_appointment("slot_card_1", patient(), "Follow-up", True).booking
+    assert booking is not None
+    tools.cancel_appointment(booking.booking_id, explicit_confirmation=True)
+
+    active_result = tools.search_bookings_by_phone("555-0100")
+    history_result = tools.search_bookings_by_phone("555-0100", include_canceled=True)
+
+    assert active_result.success is True
+    assert active_result.bookings == []
+    assert len(history_result.bookings) == 1
+    assert history_result.bookings[0].booking_id == booking.booking_id
+
+
 def test_reschedule_requires_explicit_confirmation() -> None:
     tools = make_tools()
     booking = tools.book_appointment("slot_card_1", patient(), "Follow-up", True).booking
@@ -153,8 +180,11 @@ def test_json_store_persists_booking_across_instances(tmp_path) -> None:
     second_store = JsonAppointmentStore(tmp_path)
     persisted_booking = second_store.get_booking(booking.booking_id)
     persisted_slot = second_store.get_slot("slot_card_1")
+    persisted_lookup = SchedulingTools(second_store).search_bookings_by_phone("555-0100")
 
     assert persisted_booking is not None
     assert persisted_booking.booking_id == booking.booking_id
     assert persisted_slot is not None
     assert persisted_slot.is_booked is True
+    assert len(persisted_lookup.bookings) == 1
+    assert persisted_lookup.bookings[0].booking_id == booking.booking_id

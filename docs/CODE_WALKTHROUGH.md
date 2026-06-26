@@ -131,6 +131,7 @@ Main tools:
 - `hold_slot()` marks a selected slot as held.
 - `book_appointment()` validates required fields and explicit confirmation before booking.
 - `get_booking()` retrieves an appointment by booking ID.
+- `search_bookings_by_phone()` retrieves already scheduled appointments by patient phone number.
 - `cancel_appointment()` requires explicit confirmation before cancellation.
 - `reschedule_appointment()` requires explicit confirmation before moving a booking to a new slot.
 
@@ -281,6 +282,8 @@ The agent is implemented directly in `app/orchestrator.py`. This keeps the contr
 
 The LLM never directly books, cancels, or reschedules. It can only request a tool call, and the deterministic tool validates whether the action is allowed.
 
+Existing appointment lookup follows the same pattern. The LLM can ask for a phone number, but appointment retrieval happens through `search_bookings_by_phone()` rather than model memory.
+
 ### JSON Store For Local Persistence
 
 The app persists slots and bookings in JSON files so appointment state survives server restarts without requiring a database.
@@ -312,4 +315,3 @@ Response sanitizer: Expands dates and removes speech-unfriendly punctuation.
 API: Streams response to the browser.
 Browser UI: Displays text and optionally plays TTS.
 ```
-

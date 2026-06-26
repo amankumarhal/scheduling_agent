@@ -79,6 +79,17 @@ class SearchSlotsOutput(BaseModel):
     slots: list[AppointmentSlot] = Field(default_factory=list)
 
 
+class SearchBookingsByPhoneInput(BaseModel):
+    phone_number: str = Field(..., min_length=7)
+    include_canceled: bool = False
+
+
+class SearchBookingsByPhoneOutput(BaseModel):
+    success: bool
+    message: str
+    bookings: list[AppointmentBooking] = Field(default_factory=list)
+
+
 class HoldSlotInput(BaseModel):
     slot_id: str
     patient_id: str | None = None
