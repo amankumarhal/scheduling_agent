@@ -16,35 +16,44 @@ class InMemoryAppointmentStore:
     """Small in-memory scheduling backend with sample data only."""
 
     def __init__(self, slots: list[AppointmentSlot] | None = None):
+        """Seed the store with copied slots so tests cannot mutate shared sample data."""
         self.slots: dict[str, AppointmentSlot] = {
             slot.slot_id: deepcopy(slot) for slot in (slots or create_sample_slots())
         }
         self.bookings: dict[str, AppointmentBooking] = {}
 
     def list_slots(self) -> list[AppointmentSlot]:
+        """Return all slots currently known to the scheduling backend."""
         return list(self.slots.values())
 
     def get_slot(self, slot_id: str) -> AppointmentSlot | None:
+        """Fetch one slot by internal slot ID."""
         return self.slots.get(slot_id)
 
     def save_slot(self, slot: AppointmentSlot) -> None:
+        """Persist the latest slot status in memory."""
         self.slots[slot.slot_id] = slot
 
     def add_booking(self, booking: AppointmentBooking) -> AppointmentBooking:
+        """Store a newly created booking by booking reference."""
         self.bookings[booking.booking_id] = booking
         return booking
 
     def get_booking(self, booking_id: str) -> AppointmentBooking | None:
+        """Fetch a booking by user-facing booking reference."""
         return self.bookings.get(booking_id)
 
     def list_bookings(self) -> list[AppointmentBooking]:
+        """Return all bookings currently held by the backend."""
         return list(self.bookings.values())
 
     def save_booking(self, booking: AppointmentBooking) -> AppointmentBooking:
+        """Persist the latest booking status in memory."""
         self.bookings[booking.booking_id] = booking
         return booking
 
     def reset(self) -> None:
+        """Restore sample slot data and clear bookings for a clean run."""
         self.slots = {slot.slot_id: slot for slot in create_sample_slots()}
         self.bookings = {}
 
@@ -53,6 +62,7 @@ class JsonAppointmentStore(InMemoryAppointmentStore):
     """JSON-backed store for local persistence without an external database."""
 
     def __init__(self, data_dir: str | Path | None = None):
+        """Load JSON state, start a background writer, and register shutdown flush."""
         self.data_dir = Path(data_dir or get_settings().appointment_data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.slots_path = self.data_dir / "slots.json"
@@ -68,6 +78,7 @@ class JsonAppointmentStore(InMemoryAppointmentStore):
         atexit.register(self.shutdown)
 
     def _load_slots(self) -> dict[str, AppointmentSlot]:
+        """Load persisted slots or create fresh sample slots on first run."""
         if not self.slots_path.exists():
             return {slot.slot_id: slot for slot in create_sample_slots()}
         with self.slots_path.open("r", encoding="utf-8") as handle:
@@ -75,6 +86,7 @@ class JsonAppointmentStore(InMemoryAppointmentStore):
         return {item["slot_id"]: AppointmentSlot.model_validate(item) for item in data}
 
     def _load_bookings(self) -> dict[str, AppointmentBooking]:
+        """Load persisted bookings and migrate old nonnumeric booking references."""
         if not self.bookings_path.exists():
             return {}
         with self.bookings_path.open("r", encoding="utf-8") as handle:
@@ -88,6 +100,7 @@ class JsonAppointmentStore(InMemoryAppointmentStore):
         return bookings
 
     def _persist_now(self) -> None:
+        """Write an atomic snapshot of slots and bookings to JSON files."""
         with self._lock:
             slots_payload = [
                 slot.model_dump(mode="json") for slot in sorted(self.slots.values(), key=lambda item: item.slot_id)
@@ -106,9 +119,11 @@ class JsonAppointmentStore(InMemoryAppointmentStore):
         )
 
     def _request_persist(self) -> None:
+        """Signal the background writer that there is new state to flush."""
         self._persist_event.set()
 
     def _persist_worker(self) -> None:
+        """Coalesce rapid mutations into fewer JSON writes off the request path."""
         while not self._stop_event.is_set():
             if not self._persist_event.wait(timeout=0.25):
                 continue
@@ -117,10 +132,12 @@ class JsonAppointmentStore(InMemoryAppointmentStore):
             self._persist_now()
 
     def flush(self) -> None:
+        """Force JSON persistence immediately for tests and shutdown."""
         self._persist_event.clear()
         self._persist_now()
 
     def shutdown(self) -> None:
+        """Stop the background writer after flushing the latest state."""
         if self._stop_event.is_set():
             return
         self._stop_event.set()
@@ -129,6 +146,7 @@ class JsonAppointmentStore(InMemoryAppointmentStore):
 
     @staticmethod
     def _write_json(path: Path, payload: list[dict]) -> None:
+        """Write JSON through a temporary file so partial writes are avoided."""
         temp_path = path.with_suffix(f"{path.suffix}.tmp")
         with temp_path.open("w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2)
@@ -136,27 +154,32 @@ class JsonAppointmentStore(InMemoryAppointmentStore):
         temp_path.replace(path)
 
     def save_slot(self, slot: AppointmentSlot) -> None:
+        """Update a slot in memory and queue a background JSON flush."""
         with self._lock:
             super().save_slot(slot)
         self._request_persist()
 
     def add_booking(self, booking: AppointmentBooking) -> AppointmentBooking:
+        """Add a booking in memory and queue persistence."""
         with self._lock:
             result = super().add_booking(booking)
         self._request_persist()
         return result
 
     def save_booking(self, booking: AppointmentBooking) -> AppointmentBooking:
+        """Update a booking in memory and queue persistence."""
         with self._lock:
             result = super().save_booking(booking)
         self._request_persist()
         return result
 
     def reset(self) -> None:
+        """Reset runtime data and queue persistence of the reset state."""
         with self._lock:
             super().reset()
         self._request_persist()
 
 
 def create_default_store() -> JsonAppointmentStore:
+    """Create the default local persistent store used by the app."""
     return JsonAppointmentStore()

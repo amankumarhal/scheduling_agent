@@ -31,10 +31,12 @@ from app.store import InMemoryAppointmentStore
 
 
 def _normalize(value: str | None) -> str:
+    """Normalize optional user text for case-insensitive comparisons."""
     return (value or "").strip().lower()
 
 
 def _digits_only(value: str | None) -> str:
+    """Keep only digits so phone-number lookup works across spoken formats."""
     return "".join(ch for ch in (value or "") if ch.isdigit())
 
 
@@ -66,6 +68,7 @@ SPECIALTY_ALIASES = {
 
 
 def _canonical_specialty(value: str | None) -> str:
+    """Map specialist words and misspellings onto canonical specialties."""
     text = _normalize(value)
     if not text:
         return ""
@@ -89,6 +92,7 @@ def _canonical_specialty(value: str | None) -> str:
 
 
 def _name_similarity(left: str, right: str) -> float:
+    """Score provider-name similarity for fuzzy doctor lookup."""
     left_norm = _normalize(left).replace("dr.", "").replace("dr ", "").strip()
     right_norm = _normalize(right).replace("dr.", "").replace("dr ", "").strip()
     if not left_norm or not right_norm:
@@ -103,6 +107,7 @@ def _name_similarity(left: str, right: str) -> float:
 
 
 def _time_window_matches(slot: AppointmentSlot, preferred_time_window: str | None) -> bool:
+    """Check whether a slot falls into a simple morning, afternoon, or evening window."""
     if not preferred_time_window:
         return True
     window = preferred_time_window.lower()
@@ -117,6 +122,7 @@ def _time_window_matches(slot: AppointmentSlot, preferred_time_window: str | Non
 
 
 def _date_matches(slot: AppointmentSlot, preferred_date: str | None) -> bool:
+    """Match simple date phrases like today, tomorrow, weekdays, or ISO dates."""
     if not preferred_date:
         return True
     text = preferred_date.strip().lower()
@@ -132,6 +138,7 @@ def _date_matches(slot: AppointmentSlot, preferred_date: str | None) -> bool:
 
 
 def _format_appointment_time(slot: AppointmentSlot | None) -> str | None:
+    """Format a slot time in a voice-friendly way for user responses."""
     if not slot:
         return None
     start = slot.start_time.strftime("%A, %B %-d, %Y at %-I:%M %p")
@@ -140,6 +147,7 @@ def _format_appointment_time(slot: AppointmentSlot | None) -> str | None:
 
 
 def _slot_options(slots: list[AppointmentSlot]) -> list[AppointmentSlotOption]:
+    """Convert raw slots into concise user-facing slot options."""
     options = []
     for slot in slots:
         appointment_time = _format_appointment_time(slot)
@@ -158,17 +166,21 @@ def _slot_options(slots: list[AppointmentSlot]) -> list[AppointmentSlotOption]:
 
 
 def _error_output(output_model: type[BaseModel], message: str) -> BaseModel:
+    """Create a structured tool error without raising into the orchestrator."""
     return output_model(success=False, message=message)
 
 
 class SchedulingTools:
     def __init__(self, store: InMemoryAppointmentStore):
+        """Attach deterministic tools to the selected appointment store."""
         self.store = store
 
     def list_specialties(self) -> dict[str, Any]:
+        """Return the supported specialties without touching appointment state."""
         return {"success": True, "message": "Available specialties returned.", "specialties": SPECIALTIES}
 
     def _appointment_detail(self, booking: AppointmentBooking) -> AppointmentDetail:
+        """Join booking and slot data into a voice-friendly appointment detail."""
         slot = self.store.get_slot(booking.slot_id)
         return AppointmentDetail(
             booking_id=booking.booking_id,
@@ -184,6 +196,7 @@ class SchedulingTools:
         )
 
     def _available_slots_for_scope(self, specialty: str | None = None, provider_name: str | None = None) -> list[AppointmentSlot]:
+        """Find soonest available alternatives within an optional specialty or provider scope."""
         specialty_norm = _normalize(_canonical_specialty(specialty))
         provider_norm = _normalize(provider_name)
         slots = []
@@ -204,6 +217,7 @@ class SchedulingTools:
         preferred_time_window: str | None = None,
         provider_name: str | None = None,
     ) -> SearchSlotsOutput:
+        """Search available slots and return alternatives when an exact preference misses."""
         try:
             data = SearchSlotsInput(
                 specialty=specialty,
@@ -263,6 +277,7 @@ class SchedulingTools:
         preferred_date: str | None = None,
         preferred_time_window: str | None = None,
     ) -> SearchSlotsOutput:
+        """Fuzzy-search by provider name and infer the specialty from matched slots."""
         try:
             data = SearchProviderSlotsInput(
                 provider_query=provider_query,
@@ -339,6 +354,7 @@ class SchedulingTools:
         )
 
     def hold_slot(self, slot_id: str, patient_id: str | None = None) -> HoldSlotOutput:
+        """Mark a slot as held without creating a booking."""
         try:
             data = HoldSlotInput(slot_id=slot_id, patient_id=patient_id)
         except ValidationError as exc:
@@ -362,6 +378,7 @@ class SchedulingTools:
         appointment_reason: str,
         explicit_confirmation: bool,
     ) -> BookAppointmentOutput:
+        """Book a valid slot only after required fields and explicit confirmation."""
         try:
             data = BookAppointmentInput(
                 slot_id=slot_id,
@@ -398,6 +415,7 @@ class SchedulingTools:
         return BookAppointmentOutput(success=True, message="Appointment booked successfully.", booking=booking)
 
     def get_booking(self, booking_id: str) -> dict[str, Any]:
+        """Retrieve one booking and include user-facing appointment details."""
         booking = self.store.get_booking(booking_id)
         if not booking:
             return {"success": False, "message": "Booking not found.", "booking": None, "appointment_detail": None}
@@ -413,6 +431,7 @@ class SchedulingTools:
         phone_number: str,
         include_canceled: bool = False,
     ) -> SearchBookingsByPhoneOutput:
+        """Find scheduled appointments by phone number for lookup, cancel, or reschedule."""
         try:
             data = SearchBookingsByPhoneInput(phone_number=phone_number, include_canceled=include_canceled)
         except ValidationError as exc:
@@ -461,6 +480,7 @@ class SchedulingTools:
         patient_name: str | None = None,
         explicit_confirmation: bool = False,
     ) -> CancelAppointmentOutput:
+        """Cancel a booking only after explicit confirmation and optional name match."""
         try:
             data = CancelAppointmentInput(
                 booking_id=booking_id,
@@ -496,6 +516,7 @@ class SchedulingTools:
         new_slot_id: str,
         explicit_confirmation: bool = False,
     ) -> RescheduleAppointmentOutput:
+        """Move a booking to a new available slot only after explicit confirmation."""
         try:
             data = RescheduleAppointmentInput(
                 booking_id=booking_id,

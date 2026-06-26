@@ -15,10 +15,12 @@ from app.config import Settings, get_settings
 
 @lru_cache
 def _openai_audio_client(api_key: str) -> OpenAI:
+    """Reuse the OpenAI audio client across speech calls."""
     return OpenAI(api_key=api_key)
 
 
 def synthesize_speech_bytes(text: str) -> bytes:
+    """Generate speech bytes through the configured TTS provider order."""
     settings = get_settings()
     providers = _provider_order(settings.audio_tts_provider, settings)
     errors = []
@@ -38,6 +40,7 @@ def synthesize_speech_bytes(text: str) -> bytes:
 
 
 def cartesia_streaming_enabled() -> bool:
+    """Report whether Cartesia streaming is both selected and configured."""
     settings = get_settings()
     provider = (settings.audio_tts_provider or "auto").strip().lower()
     if provider == "auto":
@@ -46,6 +49,7 @@ def cartesia_streaming_enabled() -> bool:
 
 
 def stream_cartesia_sse_events(text: str) -> Iterator[dict]:
+    """Proxy Cartesia SSE audio chunks as small dictionaries for the browser."""
     settings = get_settings()
     if not settings.cartesia_api_key:
         raise RuntimeError("CARTESIA_API_KEY is not set. Cannot stream speech with Cartesia.")
@@ -102,6 +106,7 @@ def stream_cartesia_sse_events(text: str) -> Iterator[dict]:
 
 
 def speech_media_type() -> str:
+    """Return the response media type for the selected nonstreaming TTS provider."""
     settings = get_settings()
     provider = (settings.audio_tts_provider or "auto").strip().lower()
     if provider == "auto":
@@ -114,6 +119,7 @@ def speech_media_type() -> str:
 
 
 def _provider_order(requested_provider: str, settings: Settings) -> list[str]:
+    """Resolve explicit or auto TTS provider selection with fallback order."""
     provider = (requested_provider or "auto").strip().lower()
     if provider == "auto":
         if settings.cartesia_api_key:
@@ -133,6 +139,7 @@ def _provider_order(requested_provider: str, settings: Settings) -> list[str]:
 
 
 def _synthesize_with_cartesia(text: str, settings: Settings) -> bytes:
+    """Request complete speech audio from Cartesia."""
     if not settings.cartesia_api_key:
         raise RuntimeError("CARTESIA_API_KEY is not set. Cannot synthesize speech with Cartesia.")
 
@@ -166,6 +173,7 @@ def _synthesize_with_cartesia(text: str, settings: Settings) -> bytes:
 
 
 def _synthesize_with_deepgram(text: str, settings: Settings) -> bytes:
+    """Request complete speech audio from Deepgram."""
     if not settings.deepgram_api_key:
         raise RuntimeError("DEEPGRAM_API_KEY is not set. Cannot synthesize speech with Deepgram.")
 
@@ -187,6 +195,7 @@ def _synthesize_with_deepgram(text: str, settings: Settings) -> bytes:
 
 
 def _synthesize_with_openai_bytes(text: str, settings: Settings) -> bytes:
+    """Request complete speech audio from OpenAI."""
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not set. Cannot synthesize speech with OpenAI.")
     client = _openai_audio_client(settings.openai_api_key)
@@ -203,6 +212,7 @@ def _synthesize_with_openai_bytes(text: str, settings: Settings) -> bytes:
 
 
 def synthesize_speech(text: str, output_path: str) -> str:
+    """Write synthesized speech to a local file for the voice script."""
     settings = get_settings()
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)

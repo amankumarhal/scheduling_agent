@@ -72,6 +72,7 @@ SYMPTOM_SPECIALTIES = {
 
 
 def classify_intent(text: str) -> IntentClassification:
+    """Classify the latest user utterance before the LLM decides the next response."""
     original = text or ""
     lowered = _normalize(original)
     entities = IntentEntities(
@@ -134,6 +135,7 @@ def _result(
     entities: IntentEntities,
     ambiguity_flag: str | None,
 ) -> IntentClassification:
+    """Create a typed classifier result with controlled literal values."""
     return IntentClassification(
         intent=intent,  # type: ignore[arg-type]
         confidence=confidence,  # type: ignore[arg-type]
@@ -143,14 +145,17 @@ def _result(
 
 
 def _normalize(value: str) -> str:
+    """Lowercase and collapse whitespace for regex-based matching."""
     return " ".join(value.strip().lower().split())
 
 
 def _matches_any(text: str, patterns: list[str]) -> bool:
+    """Return true when any regex pattern matches the normalized text."""
     return any(re.search(pattern, text) for pattern in patterns)
 
 
 def _extract_specialty(text: str) -> str | None:
+    """Extract a canonical specialty using aliases first and bounded fuzzy matching second."""
     for alias, specialty in SPECIALTY_CANDIDATES:
         if re.search(rf"\b{re.escape(alias)}\b", text):
             return specialty
@@ -181,6 +186,7 @@ def _extract_specialty(text: str) -> str | None:
 
 
 def _extract_provider(text: str) -> str | None:
+    """Extract simple provider mentions such as Dr. Patel or with Naomi Chen."""
     match = re.search(r"\bDr\.?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)", text)
     if match:
         return f"Dr. {match.group(1)}"
@@ -191,6 +197,7 @@ def _extract_provider(text: str) -> str | None:
 
 
 def _extract_date_phrase(text: str) -> str | None:
+    """Pull out the raw date or time phrase for downstream slot search."""
     patterns = [
         r"\b(today|tomorrow|tonight)\b",
         r"\bnext\s+(week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
@@ -206,6 +213,7 @@ def _extract_date_phrase(text: str) -> str | None:
 
 
 def _extract_patient_is_caller(text: str) -> bool | None:
+    """Infer whether the caller appears to be booking for self or someone else."""
     if re.search(r"\b(my daughter|my son|my mother|my father|my mom|my dad|my wife|my husband|for someone else)\b", text):
         return False
     if re.search(r"\b(i need|i want|i would like|book me|schedule me|my appointment)\b", text):
@@ -214,32 +222,39 @@ def _extract_patient_is_caller(text: str) -> bool | None:
 
 
 def _has_crosstalk(text: str) -> bool:
+    """Detect obvious transcription hints that multiple speakers were present."""
     return "people talking" in text or "multiple speakers" in text or "crosstalk" in text
 
 
 def _is_medical_advice(text: str) -> bool:
+    """Detect medical-advice questions that the assistant must not answer."""
     return bool(re.search(r"\b(should i be worried|is this normal|what does this mean|do i need treatment)\b", text))
 
 
 def _is_out_of_scope(text: str) -> bool:
+    """Detect requests outside scheduling, cancellation, rescheduling, or lookup."""
     return bool(re.search(r"\b(prescription refill|refill|lab result|test result|billing|bill|invoice)\b", text))
 
 
 def _is_general_question(text: str) -> bool:
+    """Detect operational questions that should not start a booking flow."""
     return bool(re.search(r"\b(hours|located|location|address|take blue cross|insurance|how much|cost|price)\b", text))
 
 
 def _is_reschedule(text: str) -> bool:
+    """Detect rescheduling, including cancel-and-book phrasing."""
     if re.search(r"\bcancel\b.*\b(book|move|reschedule|instead)\b", text):
         return True
     return bool(re.search(r"\b(reschedule|move my appointment|move it|change my appointment|change the appointment)\b", text))
 
 
 def _is_cancel(text: str) -> bool:
+    """Detect cancellation intent."""
     return bool(re.search(r"\b(cancel|call off)\b", text))
 
 
 def _is_lookup(text: str) -> bool:
+    """Detect existing-appointment lookup or confirmation intent."""
     return bool(
         re.search(
             r"\b(do i have|when is my appointment|what time is my appointment|confirm my appointment|appointment details|lookup my appointment)\b",
@@ -249,6 +264,7 @@ def _is_lookup(text: str) -> bool:
 
 
 def _symptom_specialty(text: str) -> str | None:
+    """Infer a routing specialty from nonurgent symptom phrases."""
     for phrase, specialty in SYMPTOM_SPECIALTIES.items():
         if phrase in text:
             return specialty
@@ -256,6 +272,7 @@ def _symptom_specialty(text: str) -> str | None:
 
 
 def _is_booking(text: str, entities: IntentEntities) -> bool:
+    """Detect direct and implicit booking intent."""
     if re.search(r"\b(book|schedule|appointment|see a|see an|come in|get in)\b", text):
         return True
     if re.search(r"\b(do you have anything|anything available|availability|available time)\b", text):
@@ -266,10 +283,12 @@ def _is_booking(text: str, entities: IntentEntities) -> bool:
 
 
 def _looks_cut_off(text: str) -> bool:
+    """Mark partial or garbled booking phrases as lower confidence."""
     return text.endswith("...") or text.endswith(" a") or "[cut off]" in text or "garbled" in text
 
 
 def _is_vague(text: str) -> bool:
+    """Detect vague openers that should receive a clarification question."""
     cleaned = text.strip(" .?!")
     return cleaned in {
         "i need help",

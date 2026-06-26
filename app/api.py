@@ -33,6 +33,7 @@ class SpeakRequest(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
+    """Serve the browser chat and hold-to-talk voice interface."""
     return """
     <!doctype html>
     <html lang="en">
@@ -291,10 +292,12 @@ def home() -> str:
           let lastAssistantText = "";
           let lastAssistantAt = 0;
 
+          // Update the small status label shown in the header.
           function setStatus(text) {
             statusEl.textContent = text;
           }
 
+          // Render one chat bubble and keep the transcript scrolled down.
           function addMessage(role, text) {
             const bubble = document.createElement("div");
             bubble.className = `msg ${role}`;
@@ -304,6 +307,7 @@ def home() -> str:
             return bubble;
           }
 
+          // Show tool calls when debug mode is enabled.
           function addToolTrace(toolCalls) {
             if (!debugToggle.checked || !toolCalls || toolCalls.length === 0) return;
             const details = document.createElement("details");
@@ -318,6 +322,7 @@ def home() -> str:
             messages.scrollTop = messages.scrollHeight;
           }
 
+          // Avoid rendering the same assistant message twice after stream finalization.
           function shouldSkipDuplicateAssistant(text) {
             const normalized = (text || "").trim();
             const now = Date.now();
@@ -329,12 +334,14 @@ def home() -> str:
             return false;
           }
 
+          // Disable text input while a request is in flight.
           function setBusy(value) {
             busy = value;
             sendButton.disabled = value;
             input.disabled = value;
           }
 
+          // Stop any current TTS playback or streaming audio immediately.
           function interruptSpeech() {
             if (speechController) {
               speechController.abort();
@@ -359,6 +366,7 @@ def home() -> str:
             setStatus("Ready");
           }
 
+          // Convert Cartesia base64 chunks into raw bytes for Web Audio.
           function base64ToArrayBuffer(base64) {
             const binary = atob(base64);
             const bytes = new Uint8Array(binary.length);
@@ -368,6 +376,7 @@ def home() -> str:
             return bytes.buffer;
           }
 
+          // Decode little-endian float32 PCM samples from a streamed audio chunk.
           function pcmF32ToSamples(arrayBuffer) {
             const view = new DataView(arrayBuffer);
             const sampleCount = Math.floor(view.byteLength / 4);
@@ -378,6 +387,7 @@ def home() -> str:
             return samples;
           }
 
+          // Schedule one streamed PCM chunk into a continuous Web Audio timeline.
           async function playPcmChunk(chunk) {
             if (!currentAudioContext) {
               currentAudioContext = new AudioContext({ sampleRate: chunk.sample_rate || 44100 });
@@ -403,6 +413,7 @@ def home() -> str:
             };
           }
 
+          // Try low-latency Cartesia streaming TTS first.
           async function speakWithStream(text) {
             const response = await fetch("/speak/stream", {
               method: "POST",
@@ -434,6 +445,7 @@ def home() -> str:
             return true;
           }
 
+          // Fall back to complete audio-file playback when streaming is unavailable.
           async function speakWithBlob(text) {
             const response = await fetch("/speak", {
               method: "POST",
@@ -460,6 +472,7 @@ def home() -> str:
             return true;
           }
 
+          // Speak assistant text if auto-speak is enabled, preferring streaming TTS.
           async function speak(text) {
             if (!autoSpeak.checked || !text) return;
             interruptSpeech();
@@ -478,6 +491,7 @@ def home() -> str:
             }
           }
 
+          // Render a nonstreaming agent response and optionally play TTS.
           async function handleAgentResponse(payload) {
             if (shouldSkipDuplicateAssistant(payload.message)) return;
             addMessage("assistant", payload.message);
@@ -485,6 +499,7 @@ def home() -> str:
             await speak(payload.message);
           }
 
+          // Show the initial assistant greeting and optionally speak it.
           async function showGreeting(options = { spoken: false }) {
             const greeting = "Hi, I can help schedule, reschedule, or cancel an appointment. What would you like to do?";
             addMessage("assistant", greeting);
@@ -493,6 +508,7 @@ def home() -> str:
             }
           }
 
+          // Send text to the SSE chat endpoint and render returned deltas.
           async function handleStreamingChat(text) {
             const assistantBubble = addMessage("assistant", "");
             let finalPayload = null;
@@ -538,6 +554,7 @@ def home() -> str:
             }
           }
 
+          // Submit typed text through the agent and update the UI state.
           async function sendText() {
             const text = input.value.trim();
             if (!text || busy) return;
@@ -557,6 +574,7 @@ def home() -> str:
             }
           }
 
+          // Upload recorded audio, transcribe it, run the agent, then play the response.
           async function sendVoice(blob) {
             if (voiceRequestInFlight) return;
             voiceRequestInFlight = true;
@@ -588,6 +606,7 @@ def home() -> str:
             }
           }
 
+          // Start hold-to-talk recording with the browser MediaRecorder API.
           async function startRecording(event) {
             event.preventDefault();
             if (busy || mediaRecorder) return;
@@ -618,6 +637,7 @@ def home() -> str:
             }
           }
 
+          // Stop hold-to-talk recording and trigger voice processing.
           function stopRecording(event) {
             if (event) event.preventDefault();
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
@@ -652,23 +672,28 @@ def home() -> str:
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    """Return a lightweight readiness check for local runs and smoke tests."""
     return {"status": "ok"}
 
 
 @app.get("/favicon.ico")
 def favicon() -> Response:
+    """Avoid noisy browser favicon errors in local logs."""
     return Response(status_code=204)
 
 
 @app.post("/chat")
 def chat(request: ChatRequest) -> dict:
+    """Run one text message through the orchestrator and return structured JSON."""
     response = agent.handle_message(request.message, session_id=request.session_id)
     return response.model_dump(mode="json")
 
 
 @app.post("/chat/stream")
 async def chat_stream(request: ChatRequest) -> StreamingResponse:
+    """Return an SSE response for browser chat rendering."""
     async def event_stream():
+        """Emit the completed assistant message as SSE delta and final events."""
         response = agent.handle_message(request.message, session_id=request.session_id)
         yield f"event: delta\ndata: {json.dumps({'text': response.message})}\n\n"
         yield f"event: final\ndata: {response.model_dump_json()}\n\n"
@@ -678,6 +703,7 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
 
 @app.post("/speak")
 def speak(request: SpeakRequest) -> Response:
+    """Generate complete TTS audio for the given assistant text."""
     try:
         audio = synthesize_speech_bytes(request.text)
     except RuntimeError as exc:
@@ -687,10 +713,12 @@ def speak(request: SpeakRequest) -> Response:
 
 @app.post("/speak/stream")
 def speak_stream(request: SpeakRequest) -> StreamingResponse:
+    """Stream Cartesia TTS chunks to the browser when streaming is configured."""
     if not cartesia_streaming_enabled():
         raise HTTPException(status_code=409, detail="Cartesia streaming TTS is not enabled.")
 
     def event_stream():
+        """Translate provider chunks into browser-friendly SSE events."""
         try:
             for event in stream_cartesia_sse_events(request.text):
                 yield f"event: chunk\ndata: {json.dumps(event)}\n\n"
@@ -707,6 +735,7 @@ async def voice(
     session_id: str = Form(default="default"),
     tts_output_path: str | None = Form(default=None),
 ) -> dict:
+    """Accept an uploaded audio turn, transcribe it, run the agent, and optionally write TTS."""
     suffix = Path(audio.filename or "audio.wav").suffix or ".wav"
     with NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
         temp_audio.write(await audio.read())

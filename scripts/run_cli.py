@@ -13,6 +13,7 @@ from app.orchestrator import AppointmentOrchestrator  # noqa: E402
 
 
 def main() -> None:
+    """Run a text-only local conversation loop against the orchestrator."""
     parser = argparse.ArgumentParser(description="Text CLI for the appointment scheduling assistant.")
     parser.add_argument("--session-id", default="cli", help="Conversation session ID.")
     parser.add_argument("--debug", action="store_true", help="Show tool calls and state summary.")

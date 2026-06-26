@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 def generate_booking_reference() -> str:
+    """Create a voice-friendly numeric booking reference."""
     return str(uuid4().int)[:10]
 
 
@@ -25,6 +26,7 @@ class PatientInfo(BaseModel):
     @field_validator("patient_name", "phone_number")
     @classmethod
     def not_blank(cls, value: str) -> str:
+        """Reject blank required patient fields before tools can mutate state."""
         cleaned = value.strip()
         if not cleaned:
             raise ValueError("Field cannot be blank.")
@@ -54,6 +56,7 @@ class AppointmentBooking(BaseModel):
     @field_validator("appointment_reason")
     @classmethod
     def reason_not_blank(cls, value: str) -> str:
+        """Ensure every booking keeps a short reason for the visit."""
         cleaned = value.strip()
         if not cleaned:
             raise ValueError("Appointment reason is required.")
@@ -165,6 +168,7 @@ class BookAppointmentInput(BaseModel):
     @field_validator("appointment_reason")
     @classmethod
     def appointment_reason_not_blank(cls, value: str) -> str:
+        """Validate booking tool input before deterministic booking logic runs."""
         cleaned = value.strip()
         if not cleaned:
             raise ValueError("Appointment reason is required.")

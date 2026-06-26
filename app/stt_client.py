@@ -15,10 +15,12 @@ from app.config import Settings, get_settings
 
 @lru_cache
 def _openai_audio_client(api_key: str) -> OpenAI:
+    """Reuse the OpenAI audio client across transcription calls."""
     return OpenAI(api_key=api_key)
 
 
 def transcribe_audio(file_path: str) -> str:
+    """Transcribe an audio file through the configured STT provider order."""
     settings = get_settings()
     path = Path(file_path)
     if not path.exists():
@@ -40,6 +42,7 @@ def transcribe_audio(file_path: str) -> str:
 
 
 def _provider_order(requested_provider: str, settings: Settings) -> list[str]:
+    """Resolve explicit or auto STT provider selection with optional fallback."""
     provider = (requested_provider or "auto").strip().lower()
     if provider == "auto":
         primary = "deepgram" if settings.deepgram_api_key else "openai"
@@ -54,6 +57,7 @@ def _provider_order(requested_provider: str, settings: Settings) -> list[str]:
 
 
 def _transcribe_with_deepgram(path: Path, settings: Settings) -> str:
+    """Send an audio file to Deepgram with English transcription forced."""
     if not settings.deepgram_api_key:
         raise RuntimeError("DEEPGRAM_API_KEY is not set. Cannot transcribe audio with Deepgram.")
 
@@ -82,6 +86,7 @@ def _transcribe_with_deepgram(path: Path, settings: Settings) -> str:
 
 
 def _transcribe_with_openai(path: Path, settings: Settings) -> str:
+    """Send an audio file to OpenAI transcription with English forced."""
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not set. Cannot transcribe audio with OpenAI.")
 

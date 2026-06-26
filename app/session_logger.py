@@ -13,6 +13,7 @@ from app.config import get_settings
 
 
 def _safe_session_id(session_id: str) -> str:
+    """Convert arbitrary session IDs into safe JSONL filenames."""
     safe = re.sub(r"[^a-zA-Z0-9_.-]+", "_", session_id.strip())
     return safe[:80] or "default"
 
@@ -21,6 +22,7 @@ class SessionLogger:
     """Append-only JSONL session logger for auditing and debugging."""
 
     def __init__(self, log_dir: str | None = None):
+        """Start a background writer so request handling is not blocked by disk I/O."""
         settings = get_settings()
         self.log_dir = Path(log_dir or settings.session_log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -31,6 +33,7 @@ class SessionLogger:
         atexit.register(self.shutdown)
 
     def log(self, session_id: str, event_type: str, payload: dict[str, Any]) -> None:
+        """Queue one session event for JSONL persistence."""
         if self._closed:
             return
         record = {
@@ -43,6 +46,7 @@ class SessionLogger:
         self._queue.put((str(path), record))
 
     def _worker(self) -> None:
+        """Write queued events to per-session files and reuse file handles."""
         handles: dict[str, Any] = {}
         while True:
             item = self._queue.get()
@@ -59,6 +63,7 @@ class SessionLogger:
             handle.close()
 
     def shutdown(self) -> None:
+        """Flush and stop the logger background thread."""
         if self._closed:
             return
         self._closed = True

@@ -33,11 +33,13 @@ EMERGENCY_PATTERNS = [
 
 
 def is_emergency(text: str) -> bool:
+    """Fast rule-based emergency check before normal scheduling logic."""
     lowered = text.lower()
     return any(re.search(pattern, lowered) for pattern in EMERGENCY_PATTERNS)
 
 
 def is_emergency_clarification(text: str) -> bool:
+    """Detect when the user clarifies that a prior urgent phrase was not an emergency."""
     lowered = text.lower()
     return any(phrase in lowered for phrase in ["not an emergency", "not emergency", "false alarm"])
 
@@ -48,6 +50,7 @@ def _schema(
     properties: dict[str, Any],
     required: list[str],
 ) -> dict[str, Any]:
+    """Build one strict OpenAI tool schema from a small Python description."""
     return {
         "type": "function",
         "function": {
@@ -173,6 +176,7 @@ class AppointmentOrchestrator:
         openai_client: OpenAIClient | Any | None = None,
         store: InMemoryAppointmentStore | None = None,
     ):
+        """Wire the LLM adapter, deterministic tools, store, sessions, and logger."""
         self.store = store or create_default_store()
         self.tools = SchedulingTools(self.store)
         self.openai_client = openai_client or OpenAIClient()
@@ -180,11 +184,13 @@ class AppointmentOrchestrator:
         self.session_logger = SessionLogger()
 
     def get_state(self, session_id: str) -> ConversationState:
+        """Return existing conversation state or create a new session."""
         if session_id not in self.sessions:
             self.sessions[session_id] = ConversationState(session_id=session_id)
         return self.sessions[session_id]
 
     def handle_message(self, message: str, session_id: str = "default") -> AgentResponse:
+        """Process one user turn through safety checks, LLM tool calls, and response logging."""
         state = self.get_state(session_id)
         intent = classify_intent(message)
         state.last_intent = intent
@@ -235,6 +241,7 @@ class AppointmentOrchestrator:
         return self._agent_response(state, fallback, local_tool_calls)
 
     def _execute_tool_call(self, tool_call: Any, state: ConversationState) -> tuple[ToolCallRecord, dict[str, Any]]:
+        """Validate and execute one model-requested tool call, then create a tool message."""
         name = self._tool_name(tool_call)
         raw_arguments = self._tool_arguments(tool_call)
         try:
@@ -260,6 +267,7 @@ class AppointmentOrchestrator:
         return record, tool_message
 
     def _dispatch_tool(self, name: str, arguments: dict[str, Any], state: ConversationState) -> dict[str, Any]:
+        """Route a validated tool name to deterministic scheduling code and update session state."""
         try:
             if name == "list_specialties":
                 return self.tools.list_specialties()
@@ -321,6 +329,7 @@ class AppointmentOrchestrator:
         content: str,
         local_tool_calls: list[ToolCallRecord],
     ) -> AgentResponse:
+        """Package the final assistant text with tool trace and state summary."""
         return AgentResponse(
             message=content,
             session_id=state.session_id,
@@ -329,12 +338,14 @@ class AppointmentOrchestrator:
         )
 
     def _record_assistant_response(self, state: ConversationState, content: str) -> AgentResponse:
+        """Store and log assistant text for rule-based responses that skip the LLM."""
         content = normalize_for_voice(content)
         state.messages.append({"role": "assistant", "content": content})
         self.session_logger.log(state.session_id, "assistant", {"message": content})
         return self._agent_response(state, content, [])
 
     def _state_summary(self, state: ConversationState) -> dict[str, Any]:
+        """Expose a compact debug view without dumping full conversation history."""
         return {
             "session_id": state.session_id,
             "pending_action": state.pending_action,
@@ -347,6 +358,7 @@ class AppointmentOrchestrator:
         }
 
     def _llm_messages(self, state: ConversationState, intent: Any) -> list[dict[str, Any]]:
+        """Build a bounded prompt containing policy, intent, state, and recent conversation."""
         intent_context = {
             "role": "system",
             "content": (
@@ -379,24 +391,28 @@ class AppointmentOrchestrator:
 
     @staticmethod
     def _extract_message(response: Any) -> Any:
+        """Read the assistant message from dict mocks or OpenAI SDK objects."""
         if isinstance(response, dict):
             return response["choices"][0]["message"]
         return response.choices[0].message
 
     @staticmethod
     def _extract_content(message: Any) -> str:
+        """Read assistant text from dict mocks or OpenAI SDK message objects."""
         if isinstance(message, dict):
             return message.get("content") or ""
         return message.content or ""
 
     @staticmethod
     def _extract_tool_calls(message: Any) -> list[Any]:
+        """Read tool calls from dict mocks or OpenAI SDK message objects."""
         if isinstance(message, dict):
             return message.get("tool_calls") or []
         return message.tool_calls or []
 
     @staticmethod
     def _assistant_tool_message_for_history(message: Any) -> dict[str, Any]:
+        """Serialize assistant tool-call messages so the next LLM call has context."""
         if isinstance(message, dict):
             return message
         return {
@@ -414,18 +430,21 @@ class AppointmentOrchestrator:
 
     @staticmethod
     def _tool_name(tool_call: Any) -> str:
+        """Extract a tool name from dict mocks or OpenAI SDK tool-call objects."""
         if isinstance(tool_call, dict):
             return tool_call["function"]["name"]
         return tool_call.function.name
 
     @staticmethod
     def _tool_arguments(tool_call: Any) -> str:
+        """Extract raw JSON tool arguments from dict mocks or SDK tool-call objects."""
         if isinstance(tool_call, dict):
             return tool_call["function"].get("arguments", "{}")
         return tool_call.function.arguments
 
     @staticmethod
     def _tool_call_id(tool_call: Any) -> str:
+        """Extract the tool-call ID needed to send a valid tool response back to the LLM."""
         if isinstance(tool_call, dict):
             return tool_call.get("id", "tool_call")
         return tool_call.id

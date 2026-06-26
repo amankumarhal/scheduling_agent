@@ -14,6 +14,7 @@ from app.tts_client import synthesize_speech  # noqa: E402
 
 
 def main() -> None:
+    """Run file-based voice input through STT, the agent, and TTS output."""
     parser = argparse.ArgumentParser(description="Audio-file runner for the appointment scheduling assistant.")
     parser.add_argument("--audio", required=True, help="Path to an input audio file.")
     parser.add_argument("--out", default="response.mp3", help="Path for generated speech output.")

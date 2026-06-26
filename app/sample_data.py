@@ -12,11 +12,13 @@ SPECIALTIES = [
 
 
 def _next_weekday(days_ahead: int, hour: int, minute: int = 0) -> datetime:
+    """Build a relative sample slot time from the current local date."""
     base = datetime.now().replace(hour=hour, minute=minute, second=0, microsecond=0)
     return base + timedelta(days=days_ahead)
 
 
 def create_sample_slots() -> list[AppointmentSlot]:
+    """Create deterministic sample providers and appointment slots for local use."""
     raw_slots = [
         ("slot_pc_1", "Dr. Maya Patel", "Primary care", "Downtown Clinic", 1, 9, 0),
         ("slot_pc_2", "Dr. Maya Patel", "Primary care", "Downtown Clinic", 2, 14, 0),

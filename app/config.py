@@ -41,4 +41,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Return cached environment-backed settings for the whole process."""
     return Settings()
