@@ -1,6 +1,6 @@
 # Appointment Scheduling AI Agent
 
-An interview-ready appointment scheduling agent for booking, rescheduling, and canceling fake demo appointments. The LLM handles conversation, empathy, and deciding what information is missing. Deterministic typed tools handle all scheduling state changes, with validation and explicit confirmation required before booking, cancellation, or rescheduling.
+A production-style appointment scheduling agent for booking, rescheduling, and canceling fake demo appointments. The LLM handles conversation, empathy, and deciding what information is missing. Deterministic typed tools handle all scheduling state changes, with validation and explicit confirmation required before booking, cancellation, or rescheduling.
 
 This version intentionally uses OpenAI only:
 
@@ -206,11 +206,9 @@ Expected behavior: the agent says exactly: “I’m sorry you’re experiencing 
 - Streaming-style UI currently streams the completed assistant response after tool execution finishes.
 - Emergency handling is keyword-based and conservative.
 
-## Documentation And Slides
+## Documentation
 
 - Architecture writeup: `docs/ARCHITECTURE.md`
-- Slide outline: `docs/interview_slides.md`
-- PowerPoint deck: `docs/appointment_agent_interview_deck.pptx`
 
 ## Production Improvements
 
@@ -232,7 +230,7 @@ Expected behavior: the agent says exactly: “I’m sorry you’re experiencing 
 - Provider availability integration
 - Insurance eligibility checks
 
-## Interview Talking Points
+## Project Talking Points
 
 - I intentionally avoided LangChain for the first version to keep the system transparent and easy to debug.
 - The LLM handles conversation, but tools handle state-changing operations.

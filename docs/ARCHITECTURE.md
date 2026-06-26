@@ -4,7 +4,7 @@
 
 Healthcare appointment scheduling is conversational, stateful, and sensitive. A useful assistant must understand a patient's intent, ask for missing information, show empathy, and keep the conversation moving. At the same time, it must not let a language model directly mutate appointments, because booking, cancellation, and rescheduling require validation, auditability, and explicit confirmation.
 
-This project builds an interview-ready appointment scheduling AI agent that can schedule, reschedule, and cancel demo appointments through text and voice. The goal is to show a clean end-to-end system that is easy to run, explain, test, and extend.
+This project builds a production-style appointment scheduling AI agent that can schedule, reschedule, and cancel demo appointments through text and voice. The goal is to show a clean end-to-end system that is easy to run, explain, test, and extend.
 
 ## Solution Summary
 
@@ -107,7 +107,7 @@ Safety rules:
 
 ### Store
 
-The current backend is an in-memory fake scheduling store with demo data only. This makes the project simple to run in interviews and easy to test without external infrastructure.
+The current backend is an in-memory fake scheduling store with demo data only. This makes the project simple to run in local demos and easy to test without external infrastructure.
 
 Production replacement options:
 
@@ -146,7 +146,7 @@ Each session writes JSONL events under `logs/sessions`:
 - Assistant messages
 - Tool calls
 
-This is useful for debugging, demos, and interview discussion. In production, logging would need privacy controls, retention policies, encryption, access controls, and compliance review.
+This is useful for debugging, demos, and technical review. In production, logging would need privacy controls, retention policies, encryption, access controls, and compliance review.
 
 ## Streaming Design
 
@@ -158,7 +158,7 @@ A production version could add true token streaming from the LLM and handle tool
 2. Pause for tool execution.
 3. Stream the final answer after tool results.
 
-The current design is simpler and easier to explain in an interview.
+The current design is simpler and easier to explain in a technical walkthrough.
 
 ## Emergency Handling
 
@@ -197,7 +197,7 @@ Important additions before production:
 - Provider availability integration
 - Insurance eligibility checks
 
-## Interview Talking Points
+## Project Talking Points
 
 - I avoided LangChain in the first version so the architecture is transparent and debuggable.
 - The LLM owns conversation, not appointment mutation.
@@ -207,4 +207,3 @@ Important additions before production:
 - OpenAI clients are isolated so STT and TTS providers can be swapped later.
 - Session logs and tool traces make the system auditable.
 - Tests avoid real API calls by mocking model behavior.
-

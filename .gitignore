@@ -8,7 +8,7 @@ __pycache__/
 .coverage
 htmlcov/
 logs/
-docs/interview_slides.md
+docs/*slides*.md
 docs/*_deck.pptx
 *.pptx
 .DS_Store
