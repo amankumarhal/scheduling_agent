@@ -32,6 +32,22 @@ def test_search_filters_by_specialty() -> None:
     assert all(slot.specialty == "Dermatology" for slot in result.slots)
 
 
+def test_search_maps_specialist_role_to_specialty() -> None:
+    tools = make_tools()
+    result = tools.search_available_slots("dermatologist")
+    assert result.success is True
+    assert result.slots
+    assert all(slot.specialty == "Dermatology" for slot in result.slots)
+
+
+def test_search_handles_misspelled_specialty() -> None:
+    tools = make_tools()
+    result = tools.search_available_slots("dermitalogist")
+    assert result.success is True
+    assert result.slots
+    assert all(slot.specialty == "Dermatology" for slot in result.slots)
+
+
 def test_search_filters_by_provider_if_provided() -> None:
     tools = make_tools()
     result = tools.search_available_slots("Cardiology", provider_name="Rivera")

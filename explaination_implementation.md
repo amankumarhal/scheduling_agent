@@ -26,6 +26,8 @@ Cartesia TTS can use an SSE stream. The backend proxies streamed audio chunks to
 
 Slot search understands simple relative dates like today and tomorrow. If a preferred date or time has no exact match, the tool returns the soonest alternatives in the same result so the assistant can offer them immediately.
 
+Specialty search normalizes common specialist roles and misspellings. For example, dermatologist, dermitalogist, and skin doctor all resolve to dermatology before slot lookup.
+
 ## User Information
 
 Booking requires only patient name, phone number, appointment reason, selected slot, and explicit confirmation. Date of birth is intentionally not collected in this version.

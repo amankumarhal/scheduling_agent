@@ -38,6 +38,56 @@ def _digits_only(value: str | None) -> str:
     return "".join(ch for ch in (value or "") if ch.isdigit())
 
 
+SPECIALTY_ALIASES = {
+    "primary care": "Primary care",
+    "primary": "Primary care",
+    "pcp": "Primary care",
+    "family medicine": "Primary care",
+    "general doctor": "Primary care",
+    "general physician": "Primary care",
+    "cardiology": "Cardiology",
+    "cardiologist": "Cardiology",
+    "heart doctor": "Cardiology",
+    "heart specialist": "Cardiology",
+    "dermatology": "Dermatology",
+    "dermatologist": "Dermatology",
+    "derm": "Dermatology",
+    "skin doctor": "Dermatology",
+    "skin specialist": "Dermatology",
+    "pediatrics": "Pediatrics",
+    "pediatrician": "Pediatrics",
+    "child doctor": "Pediatrics",
+    "children doctor": "Pediatrics",
+    "physical therapy": "Physical therapy",
+    "physical therapist": "Physical therapy",
+    "physio": "Physical therapy",
+    "pt": "Physical therapy",
+}
+
+
+def _canonical_specialty(value: str | None) -> str:
+    text = _normalize(value)
+    if not text:
+        return ""
+    collapsed = " ".join(text.replace("-", " ").split())
+    if collapsed in SPECIALTY_ALIASES:
+        return SPECIALTY_ALIASES[collapsed]
+
+    candidates = {specialty: specialty for specialty in SPECIALTIES}
+    candidates.update(SPECIALTY_ALIASES)
+    best_label = ""
+    best_score = 0.0
+    for candidate, label in candidates.items():
+        candidate_norm = _normalize(candidate)
+        if candidate_norm in collapsed or collapsed in candidate_norm:
+            return label
+        score = SequenceMatcher(None, collapsed, candidate_norm).ratio()
+        if score > best_score:
+            best_label = label
+            best_score = score
+    return best_label if best_score >= 0.72 else value.strip()
+
+
 def _name_similarity(left: str, right: str) -> float:
     left_norm = _normalize(left).replace("dr.", "").replace("dr ", "").strip()
     right_norm = _normalize(right).replace("dr.", "").replace("dr ", "").strip()
@@ -134,7 +184,7 @@ class SchedulingTools:
         )
 
     def _available_slots_for_scope(self, specialty: str | None = None, provider_name: str | None = None) -> list[AppointmentSlot]:
-        specialty_norm = _normalize(specialty)
+        specialty_norm = _normalize(_canonical_specialty(specialty))
         provider_norm = _normalize(provider_name)
         slots = []
         for slot in self.store.list_slots():
@@ -164,7 +214,8 @@ class SchedulingTools:
         except ValidationError as exc:
             return _error_output(SearchSlotsOutput, f"Invalid search input: {exc.errors()}")  # type: ignore[return-value]
 
-        specialty_norm = _normalize(data.specialty)
+        specialty = _canonical_specialty(data.specialty)
+        specialty_norm = _normalize(specialty)
         provider_norm = _normalize(data.provider_name)
         matches = []
         for slot in self.store.list_slots():

@@ -69,7 +69,7 @@ OPENAI_TOOLS = [
     ),
     _schema(
         "search_available_slots",
-        "Search available, non-booked slots after the user has provided a specialty.",
+        "Search available, non-booked slots after the user has provided a specialty or specialist type such as dermatologist, cardiologist, pediatrician, or physical therapist.",
         {
             "specialty": {"type": "string"},
             "preferred_date": {"type": ["string", "null"], "description": "Optional date text, ISO date, or weekday."},
