@@ -11,6 +11,7 @@ from app.models import (
     AppointmentDetail,
     AppointmentBooking,
     AppointmentSlot,
+    AppointmentSlotOption,
     BookAppointmentInput,
     BookAppointmentOutput,
     BookingStatus,
@@ -86,6 +87,24 @@ def _format_appointment_time(slot: AppointmentSlot | None) -> str | None:
     start = slot.start_time.strftime("%A, %B %-d, %Y at %-I:%M %p")
     end = slot.end_time.strftime("%-I:%M %p")
     return f"{start} to {end}"
+
+
+def _slot_options(slots: list[AppointmentSlot]) -> list[AppointmentSlotOption]:
+    options = []
+    for slot in slots:
+        appointment_time = _format_appointment_time(slot)
+        if not appointment_time:
+            continue
+        options.append(
+            AppointmentSlotOption(
+                slot_id=slot.slot_id,
+                provider_name=slot.provider_name,
+                specialty=slot.specialty,
+                location=slot.location,
+                appointment_time=appointment_time,
+            )
+        )
+    return options
 
 
 def _error_output(output_model: type[BaseModel], message: str) -> BaseModel:
@@ -173,13 +192,19 @@ class SchedulingTools:
                         "List these soonest available alternatives in the same response and ask whether one works."
                     ),
                     slots=alternatives,
+                    slot_options=_slot_options(alternatives),
                 )
             return SearchSlotsOutput(
                 success=True,
                 message="No matching available slots were found. Ask one follow-up question for a broader date or time.",
                 slots=[],
             )
-        return SearchSlotsOutput(success=True, message=f"Found {len(matches)} available slot(s).", slots=matches)
+        return SearchSlotsOutput(
+            success=True,
+            message=f"Found {len(matches)} available slot(s).",
+            slots=matches,
+            slot_options=_slot_options(matches),
+        )
 
     def search_provider_slots(
         self,
@@ -247,6 +272,7 @@ class SchedulingTools:
                         "List these soonest available alternatives in the same response and ask whether one works."
                     ),
                     slots=alternatives,
+                    slot_options=_slot_options(alternatives),
                 )
             return SearchSlotsOutput(
                 success=True,
@@ -258,6 +284,7 @@ class SchedulingTools:
             success=True,
             message=f"Found {len(slots)} available slot(s) for {best_provider}. Specialty inferred as {specialty}.",
             slots=slots,
+            slot_options=_slot_options(slots),
         )
 
     def hold_slot(self, slot_id: str, patient_id: str | None = None) -> HoldSlotOutput:

@@ -46,6 +46,8 @@ def test_search_understands_tomorrow() -> None:
     assert result.success is True
     assert result.slots
     assert result.slots[0].provider_name == "Dr. Maya Patel"
+    assert result.slot_options
+    assert result.slot_options[0].appointment_time.startswith(result.slots[0].start_time.strftime("%A"))
 
 
 def test_search_returns_alternatives_when_preferred_time_has_no_match() -> None:
@@ -55,6 +57,7 @@ def test_search_returns_alternatives_when_preferred_time_has_no_match() -> None:
     assert result.slots
     assert "soonest available alternatives" in result.message
     assert all(slot.specialty == "Primary care" for slot in result.slots)
+    assert len(result.slot_options) == len(result.slots)
 
 
 def test_provider_search_returns_alternatives_when_preferred_time_has_no_match() -> None:
@@ -64,6 +67,7 @@ def test_provider_search_returns_alternatives_when_preferred_time_has_no_match()
     assert result.slots
     assert "soonest available alternatives" in result.message
     assert all(slot.provider_name == "Dr. Maya Patel" for slot in result.slots)
+    assert len(result.slot_options) == len(result.slots)
 
 
 def test_booking_requires_explicit_confirmation() -> None:

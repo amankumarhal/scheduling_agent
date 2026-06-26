@@ -80,6 +80,15 @@ class SearchSlotsOutput(BaseModel):
     success: bool
     message: str
     slots: list[AppointmentSlot] = Field(default_factory=list)
+    slot_options: list["AppointmentSlotOption"] = Field(default_factory=list)
+
+
+class AppointmentSlotOption(BaseModel):
+    slot_id: str
+    provider_name: str
+    specialty: str
+    location: str
+    appointment_time: str
 
 
 class SearchProviderSlotsInput(BaseModel):
