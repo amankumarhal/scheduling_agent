@@ -76,6 +76,14 @@ def test_emergency_message_triggers_emergency_response() -> None:
     assert mock.calls == 0
 
 
+def test_expanded_urgent_terms_trigger_emergency_response() -> None:
+    mock = MockOpenAIClient()
+    agent = AppointmentOrchestrator(openai_client=mock)
+    response = agent.handle_message("I was in an accident and need an appointment.", session_id="accident")
+    assert response.message == EMERGENCY_RESPONSE
+    assert mock.calls == 0
+
+
 def test_emergency_response_does_not_continue_scheduling() -> None:
     mock = MockOpenAIClient()
     agent = AppointmentOrchestrator(openai_client=mock)
@@ -96,7 +104,7 @@ def test_orchestrator_normalizes_tts_unfriendly_output() -> None:
 
 def test_orchestrator_can_lookup_existing_booking_by_phone() -> None:
     store = InMemoryAppointmentStore()
-    patient = {"patient_name": "Sample Patient", "date_of_birth": "1990-01-01", "phone_number": "555-0100"}
+    patient = {"patient_name": "Sample Patient", "phone_number": "555-0100"}
     booking = SchedulingTools(store).book_appointment("slot_card_1", patient, "Follow-up", True).booking
     assert booking is not None
     mock = MockOpenAIClient(

@@ -10,7 +10,6 @@ def make_tools() -> SchedulingTools:
 def patient() -> dict:
     return PatientInfo(
         patient_name="Sample Patient",
-        date_of_birth="1990-01-01",
         phone_number="555-0100",
     ).model_dump()
 
@@ -55,15 +54,6 @@ def test_booking_requires_patient_name() -> None:
     assert "patient_name" in result.message
 
 
-def test_booking_requires_date_of_birth() -> None:
-    tools = make_tools()
-    bad_patient = patient()
-    bad_patient["date_of_birth"] = ""
-    result = tools.book_appointment("slot_card_1", bad_patient, "Follow-up", True)
-    assert result.success is False
-    assert "date_of_birth" in result.message
-
-
 def test_booking_requires_phone_number() -> None:
     tools = make_tools()
     bad_patient = patient()
@@ -78,6 +68,24 @@ def test_booking_requires_appointment_reason() -> None:
     result = tools.book_appointment("slot_card_1", patient(), "", True)
     assert result.success is False
     assert "appointment_reason" in result.message or "Appointment reason" in result.message
+
+
+def test_booking_uses_minimal_patient_fields() -> None:
+    tools = make_tools()
+    result = tools.book_appointment("slot_card_1", patient(), "Follow-up", True)
+    assert result.success is True
+    assert result.booking is not None
+    assert set(PatientInfo.model_fields) == {"patient_name", "phone_number"}
+
+
+def test_provider_search_fuzzy_matches_doctor_name_and_infers_specialty() -> None:
+    tools = make_tools()
+    result = tools.search_provider_slots("Maya Patl")
+    assert result.success is True
+    assert result.slots
+    assert all(slot.provider_name == "Dr. Maya Patel" for slot in result.slots)
+    assert all(slot.specialty == "Primary care" for slot in result.slots)
+    assert "Specialty inferred as Primary care" in result.message
 
 
 def test_booking_changes_slot_status() -> None:

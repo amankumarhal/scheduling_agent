@@ -79,7 +79,7 @@ This module defines the typed data contracts for the system.
 
 Key models:
 
-- `PatientInfo` validates patient name, date of birth, and phone number.
+- `PatientInfo` validates patient name and phone number.
 - `AppointmentSlot` represents a provider availability slot.
 - `AppointmentBooking` represents a booked appointment.
 - Tool input and output models validate scheduling operations.
@@ -128,6 +128,7 @@ Main tools:
 
 - `list_specialties()` returns supported appointment specialties.
 - `search_available_slots()` filters open slots by specialty, date, time window, and provider.
+- `search_provider_slots()` fuzzy-matches a provider name and infers specialty from matching slot data.
 - `hold_slot()` marks a selected slot as held.
 - `book_appointment()` validates required fields and explicit confirmation before booking.
 - `get_booking()` retrieves an appointment by booking ID.
@@ -252,13 +253,13 @@ This ensures tests import the local `app` package instead of any unrelated packa
 
 This validates deterministic scheduling behavior.
 
-It checks search, specialty filtering, provider filtering, booking validation, double-book prevention, cancellation, rescheduling, and JSON persistence across store instances.
+It checks search, specialty filtering, provider filtering, provider fuzzy lookup, booking validation, double-book prevention, cancellation, rescheduling, and JSON persistence across store instances.
 
 ### `tests/test_orchestrator.py`
 
 This validates agent behavior without calling OpenAI.
 
-It uses a mock OpenAI client to test missing-information handling, empathetic tone, emergency short-circuiting, and TTS-friendly response normalization.
+It uses a mock OpenAI client to test missing-information handling, empathetic tone, urgency short-circuiting, and TTS-friendly response normalization.
 
 ### `tests/test_api.py`
 

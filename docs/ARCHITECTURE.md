@@ -15,7 +15,7 @@ Core principles:
 - The LLM handles conversation, empathy, reasoning, and missing information.
 - Tools handle booking, cancellation, rescheduling, and store mutation.
 - Booking, cancellation, and rescheduling require explicit user confirmation.
-- Emergency handling is rule-based and happens before the model is called.
+- Urgency handling is regex-based and happens before the model is called.
 - The browser UI supports text chat, hold-to-talk voice, TTS playback, and interruption.
 - Tests do not call OpenAI.
 
@@ -58,7 +58,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    Start[User message arrives] --> Emergency{Emergency terms detected?}
+    Start[User message arrives] --> Emergency{Urgent terms detected?}
     Emergency -->|Yes| EmergencyReply[Return emergency response]
     Emergency -->|No| State[Load or create session state]
     State --> Prompt[Build system and conversation messages]
@@ -144,6 +144,7 @@ Tools:
 
 - `list_specialties`
 - `search_available_slots`
+- `search_provider_slots`
 - `hold_slot`
 - `book_appointment`
 - `get_booking`
@@ -154,7 +155,8 @@ Tools:
 Safety rules:
 
 - Search only returns available, non-booked slots.
-- Booking requires name, date of birth, phone number, reason, and explicit confirmation.
+- Provider lookup uses fuzzy matching and can infer specialty from the provider's slot data.
+- Booking requires name, phone number, reason, and explicit confirmation.
 - Cancellation requires explicit confirmation.
 - Rescheduling requires explicit confirmation.
 - The same slot cannot be double-booked.
@@ -220,9 +222,9 @@ A production version could add true token streaming from the LLM and handle tool
 
 The current design is simpler and easier to explain in a technical walkthrough.
 
-## Emergency Handling
+## Urgency Handling
 
-Emergency detection happens before the LLM is called. If the user mentions severe chest pain, trouble breathing, severe bleeding, stroke symptoms, suicidal ideation, or another life-threatening concern, the assistant returns the emergency response and stops scheduling.
+Urgency detection happens before the LLM is called. If the user mentions severe chest pain, trouble breathing, severe bleeding, stroke symptoms, suicidal ideation, excruciating pain, injury, accident, or another life-threatening concern, the assistant returns the 911 response and stops scheduling.
 
 This is rule-based by design because safety-critical routing should not depend only on model behavior.
 
@@ -235,7 +237,7 @@ Potential failures and current behavior:
 - No slots available: assistant offers alternatives
 - Voice upload fetch failure: browser retries once
 - TTS unavailable: text response remains visible
-- Emergency input: scheduling is bypassed
+- Urgent input: scheduling is bypassed
 
 ## Production Improvements
 
@@ -263,7 +265,7 @@ Important additions before production:
 - The LLM owns conversation, not appointment mutation.
 - Deterministic tools own validation and state changes.
 - Explicit confirmation is required before booking, cancellation, or rescheduling.
-- Emergency handling is rule-based and happens before normal scheduling.
+- Urgency handling is regex-based and happens before normal scheduling.
 - OpenAI clients are isolated so STT and TTS providers can be swapped later.
 - Session logs and tool traces make the system auditable.
 - Tests avoid real API calls by mocking model behavior.

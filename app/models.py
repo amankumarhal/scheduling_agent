@@ -16,10 +16,9 @@ class BookingStatus(str, Enum):
 
 class PatientInfo(BaseModel):
     patient_name: str = Field(..., min_length=1)
-    date_of_birth: str = Field(..., min_length=1, description="Patient date of birth, preferably YYYY-MM-DD")
     phone_number: str = Field(..., min_length=7)
 
-    @field_validator("patient_name", "date_of_birth", "phone_number")
+    @field_validator("patient_name", "phone_number")
     @classmethod
     def not_blank(cls, value: str) -> str:
         cleaned = value.strip()
@@ -77,6 +76,12 @@ class SearchSlotsOutput(BaseModel):
     success: bool
     message: str
     slots: list[AppointmentSlot] = Field(default_factory=list)
+
+
+class SearchProviderSlotsInput(BaseModel):
+    provider_query: str
+    preferred_date: str | None = None
+    preferred_time_window: str | None = None
 
 
 class SearchBookingsByPhoneInput(BaseModel):

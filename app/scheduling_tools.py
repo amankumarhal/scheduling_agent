@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from difflib import SequenceMatcher
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
@@ -20,6 +21,7 @@ from app.models import (
     RescheduleAppointmentOutput,
     SearchBookingsByPhoneInput,
     SearchBookingsByPhoneOutput,
+    SearchProviderSlotsInput,
     SearchSlotsInput,
     SearchSlotsOutput,
 )
@@ -32,6 +34,20 @@ def _normalize(value: str | None) -> str:
 
 def _digits_only(value: str | None) -> str:
     return "".join(ch for ch in (value or "") if ch.isdigit())
+
+
+def _name_similarity(left: str, right: str) -> float:
+    left_norm = _normalize(left).replace("dr.", "").replace("dr ", "").strip()
+    right_norm = _normalize(right).replace("dr.", "").replace("dr ", "").strip()
+    if not left_norm or not right_norm:
+        return 0.0
+    if left_norm in right_norm or right_norm in left_norm:
+        return 1.0
+    left_tokens = set(left_norm.replace(",", " ").split())
+    right_tokens = set(right_norm.replace(",", " ").split())
+    token_overlap = len(left_tokens & right_tokens) / max(len(left_tokens | right_tokens), 1)
+    sequence_score = SequenceMatcher(None, left_norm, right_norm).ratio()
+    return max(token_overlap, sequence_score)
 
 
 def _time_window_matches(slot: AppointmentSlot, preferred_time_window: str | None) -> bool:
@@ -108,6 +124,73 @@ class SchedulingTools:
                 slots=[],
             )
         return SearchSlotsOutput(success=True, message=f"Found {len(matches)} available slot(s).", slots=matches)
+
+    def search_provider_slots(
+        self,
+        provider_query: str,
+        preferred_date: str | None = None,
+        preferred_time_window: str | None = None,
+    ) -> SearchSlotsOutput:
+        try:
+            data = SearchProviderSlotsInput(
+                provider_query=provider_query,
+                preferred_date=preferred_date,
+                preferred_time_window=preferred_time_window,
+            )
+        except ValidationError as exc:
+            return _error_output(SearchSlotsOutput, f"Invalid provider search input: {exc.errors()}")  # type: ignore[return-value]
+
+        ranked_providers: list[tuple[float, str]] = []
+        seen = set()
+        for slot in self.store.list_slots():
+            if slot.provider_name in seen:
+                continue
+            seen.add(slot.provider_name)
+            score = _name_similarity(data.provider_query, slot.provider_name)
+            if score >= 0.45:
+                ranked_providers.append((score, slot.provider_name))
+
+        if not ranked_providers:
+            return SearchSlotsOutput(
+                success=True,
+                message="No matching provider was found. Ask the user to clarify the provider name or choose a specialty.",
+                slots=[],
+            )
+
+        ranked_providers.sort(reverse=True)
+        best_score, best_provider = ranked_providers[0]
+        if len(ranked_providers) > 1 and best_score < 0.75:
+            provider_names = [name for _, name in ranked_providers[:3]]
+            return SearchSlotsOutput(
+                success=True,
+                message=f"Multiple similar providers were found: {provider_names}. Ask which provider the user means.",
+                slots=[],
+            )
+
+        slots = []
+        for slot in self.store.list_slots():
+            if slot.provider_name != best_provider:
+                continue
+            if not slot.is_available or slot.is_booked:
+                continue
+            if not _date_matches(slot, data.preferred_date):
+                continue
+            if not _time_window_matches(slot, data.preferred_time_window):
+                continue
+            slots.append(slot)
+
+        if not slots:
+            return SearchSlotsOutput(
+                success=True,
+                message=f"Provider {best_provider} was found, but no matching available slots were found. Offer another time or specialty.",
+                slots=[],
+            )
+        specialty = slots[0].specialty
+        return SearchSlotsOutput(
+            success=True,
+            message=f"Found {len(slots)} available slot(s) for {best_provider}. Specialty inferred as {specialty}.",
+            slots=slots,
+        )
 
     def hold_slot(self, slot_id: str, patient_id: str | None = None) -> HoldSlotOutput:
         try:

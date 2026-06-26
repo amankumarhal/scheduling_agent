@@ -21,6 +21,10 @@ EMERGENCY_PATTERNS = [
     r"\b(severe bleeding|bleeding heavily)\b",
     r"\b(stroke|face drooping|slurred speech)\b",
     r"\b(suicidal|suicide|kill myself|self harm)\b",
+    r"\b(excruciating pain|unbearable pain|worst pain)\b",
+    r"\b(had a fall|took a fall|bad fall|serious fall|fell|fallen)\b",
+    r"\b(injury|injured|serious injury|head injury)\b",
+    r"\b(accident|car crash|crash|collision)\b",
 ]
 
 
@@ -78,6 +82,19 @@ OPENAI_TOOLS = [
         ["specialty", "preferred_date", "preferred_time_window", "provider_name"],
     ),
     _schema(
+        "search_provider_slots",
+        "Fuzzy-search available slots by provider name. Call this when the user asks for a specific doctor or provider, even if the stated specialty is missing, misspelled, or conflicts with the provider.",
+        {
+            "provider_query": {"type": "string"},
+            "preferred_date": {"type": ["string", "null"], "description": "Optional date text, ISO date, or weekday."},
+            "preferred_time_window": {
+                "type": ["string", "null"],
+                "description": "Optional time preference such as morning, afternoon, or evening.",
+            },
+        },
+        ["provider_query", "preferred_date", "preferred_time_window"],
+    ),
+    _schema(
         "hold_slot",
         "Temporarily hold a slot the user is considering. This does not book the appointment.",
         {
@@ -95,10 +112,9 @@ OPENAI_TOOLS = [
                 "type": "object",
                 "properties": {
                     "patient_name": {"type": "string"},
-                    "date_of_birth": {"type": "string"},
                     "phone_number": {"type": "string"},
                 },
-                "required": ["patient_name", "date_of_birth", "phone_number"],
+                "required": ["patient_name", "phone_number"],
                 "additionalProperties": False,
             },
             "appointment_reason": {"type": "string"},
@@ -238,6 +254,10 @@ class AppointmentOrchestrator:
                 return self.tools.list_specialties()
             if name == "search_available_slots":
                 result = self.tools.search_available_slots(**arguments)
+                state.last_offered_slots = result.slots
+                return result.model_dump(mode="json")
+            if name == "search_provider_slots":
+                result = self.tools.search_provider_slots(**arguments)
                 state.last_offered_slots = result.slots
                 return result.model_dump(mode="json")
             if name == "hold_slot":

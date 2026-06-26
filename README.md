@@ -33,6 +33,8 @@ flowchart LR
     UI -->|Audio| STT[OpenAI STT, English]
     UI -->|Text| ORCH[Conversation Orchestrator]
     STT --> ORCH
+    ORCH --> URGENCY[Regex urgency classifier]
+    URGENCY --> ORCH
     ORCH --> LLM[GPT-5.5 Tool Calling]
     LLM --> ORCH
     ORCH --> TOOLS[Deterministic Scheduling Tools]
@@ -45,7 +47,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    A[Receive user message] --> B{Emergency language?}
+    A[Receive user message] --> B{Urgent language?}
     B -->|Yes| C[Return emergency response and stop scheduling]
     B -->|No| D[Load session state]
     D --> E[Call LLM with scheduling tool schemas]
@@ -222,7 +224,7 @@ Scenario 6: Emergency
 
 User says they have severe chest pain.
 
-Expected behavior: the agent says exactly: “I’m sorry you’re experiencing that. I’m not able to handle emergencies. Please call emergency services or go to the nearest emergency room now.”
+Expected behavior: the agent says exactly: “I’m sorry you’re experiencing that. I’m not able to handle emergencies. Please call 911 now.”
 
 ## Design Decisions
 
@@ -232,7 +234,8 @@ Expected behavior: the agent says exactly: “I’m sorry you’re experiencing 
 - Required explicit confirmation for booking, cancellation, and rescheduling.
 - Used a JSON-backed local scheduling store with sample appointment data.
 - Added existing appointment lookup by booking ID or patient phone number.
-- Added rule-based emergency detection before normal LLM scheduling.
+- Added fast regex-based urgency detection before normal LLM scheduling.
+- Added fuzzy provider lookup so a doctor name can take priority over a conflicting specialty.
 - Isolated OpenAI LLM, STT, and TTS clients so providers can be swapped later.
 - Normalized assistant text so TTS hears full weekday and month names.
 - Logged session events as JSONL for debugging and technical review.
@@ -257,12 +260,15 @@ This allows bookings and slot status to survive a server restart. Session logs a
 - Browser voice uses hold-to-talk audio uploads. Real-time voice transport is deferred.
 - Streaming-style UI currently streams the completed assistant response after tool execution finishes.
 - Emergency handling is keyword-based and conservative.
+- Booking requires patient name, phone number, appointment reason, selected slot, and explicit confirmation.
+- Appointment reason is reused when the user already provided it earlier in the conversation.
 - Phone lookup is intended for existing appointment information, cancellation, and rescheduling support. A production system would add authentication before showing appointment details.
 
 ## Documentation
 
 - Architecture writeup: `docs/ARCHITECTURE.md`
 - Code walkthrough: `docs/CODE_WALKTHROUGH.md`
+- Implementation notes: `explaination_implementation.md`
 
 ## Production Improvements
 
@@ -291,6 +297,6 @@ This allows bookings and slot status to survive a server restart. Session logs a
 - Booking, cancellation, and rescheduling require explicit confirmation.
 - Provider clients are separated from business logic, so OpenAI STT/TTS can later be replaced with Deepgram or Cartesia without changing the orchestrator.
 - The agent is healthcare-adjacent, so empathy, safety, and deterministic validation matter.
-- Emergency handling is rule-based and happens before normal scheduling.
+- Urgency handling is regex-based and happens before normal scheduling.
 - Tests avoid real API calls by mocking the OpenAI client.
 - A production version would need authentication, audit logging, HIPAA/security review, human handoff, and integration with a real scheduling/EHR backend.
