@@ -21,8 +21,8 @@ def transcribe_audio(file_path: str) -> str:
             transcript = client.audio.transcriptions.create(
                 model=settings.openai_stt_model,
                 file=audio_file,
+                language="en",
             )
         return getattr(transcript, "text", str(transcript))
     except OpenAIError as exc:
         raise RuntimeError(f"OpenAI transcription failed: {exc}") from exc
-

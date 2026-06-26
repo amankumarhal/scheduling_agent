@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+import json
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 from app.orchestrator import AppointmentOrchestrator
@@ -288,6 +290,7 @@ def home() -> str:
             bubble.textContent = text;
             messages.appendChild(bubble);
             messages.scrollTop = messages.scrollHeight;
+            return bubble;
           }
 
           function addToolTrace(toolCalls) {
@@ -370,6 +373,50 @@ def home() -> str:
             await speak(payload.message);
           }
 
+          async function handleStreamingChat(text) {
+            const assistantBubble = addMessage("assistant", "");
+            let finalPayload = null;
+            const response = await fetch("/chat/stream", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ message: text, session_id: sessionId })
+            });
+            if (!response.ok || !response.body) throw new Error(await response.text());
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const events = buffer.split("\\n\\n");
+              buffer = events.pop() || "";
+
+              for (const event of events) {
+                const lines = event.split("\\n");
+                const eventType = (lines.find((line) => line.startsWith("event:")) || "event: message").slice(6).trim();
+                const dataLine = lines.find((line) => line.startsWith("data:"));
+                if (!dataLine) continue;
+                const data = JSON.parse(dataLine.slice(5));
+                if (eventType === "delta") {
+                  assistantBubble.textContent += data.text;
+                  messages.scrollTop = messages.scrollHeight;
+                }
+                if (eventType === "final") {
+                  finalPayload = data;
+                }
+              }
+            }
+
+            if (finalPayload) {
+              assistantBubble.textContent = finalPayload.message;
+              addToolTrace(finalPayload.tool_calls);
+              await speak(finalPayload.message);
+            }
+          }
+
           async function sendText() {
             const text = input.value.trim();
             if (!text || busy) return;
@@ -379,13 +426,7 @@ def home() -> str:
             setBusy(true);
             setStatus("Thinking...");
             try {
-              const response = await fetch("/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: text, session_id: sessionId })
-              });
-              if (!response.ok) throw new Error(await response.text());
-              await handleAgentResponse(await response.json());
+              await handleStreamingChat(text);
             } catch (error) {
               addMessage("system", `Request failed: ${error.message}`);
             } finally {
@@ -403,7 +444,13 @@ def home() -> str:
               const data = new FormData();
               data.append("session_id", sessionId);
               data.append("audio", blob, "voice.webm");
-              const response = await fetch("/voice", { method: "POST", body: data });
+              let response;
+              try {
+                response = await fetch("/voice", { method: "POST", body: data });
+              } catch (error) {
+                setStatus("Retrying voice...");
+                response = await fetch("/voice", { method: "POST", body: data });
+              }
               if (!response.ok) throw new Error(await response.text());
               const payload = await response.json();
               addMessage("user", payload.transcription || "[voice message]");
@@ -493,6 +540,20 @@ def favicon() -> Response:
 def chat(request: ChatRequest) -> dict:
     response = agent.handle_message(request.message, session_id=request.session_id)
     return response.model_dump(mode="json")
+
+
+@app.post("/chat/stream")
+async def chat_stream(request: ChatRequest) -> StreamingResponse:
+    async def event_stream():
+        response = agent.handle_message(request.message, session_id=request.session_id)
+        words = response.message.split(" ")
+        for index, word in enumerate(words):
+            suffix = " " if index < len(words) - 1 else ""
+            yield f"event: delta\ndata: {json.dumps({'text': word + suffix})}\n\n"
+            await asyncio.sleep(0.025)
+        yield f"event: final\ndata: {response.model_dump_json()}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.post("/speak")

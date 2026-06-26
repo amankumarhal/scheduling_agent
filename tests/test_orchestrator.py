@@ -63,3 +63,10 @@ def test_emergency_response_does_not_continue_scheduling() -> None:
     assert second.message == EMERGENCY_RESPONSE
     assert second.tool_calls == []
     assert fake.calls == 0
+
+
+def test_orchestrator_normalizes_tts_unfriendly_output() -> None:
+    fake = FakeOpenAIClient([assistant_response("Fri, Jun 26 \u2014 9:00\u20139:30 AM works.")])
+    agent = AppointmentOrchestrator(openai_client=fake)
+    response = agent.handle_message("Show me a time.", session_id="normalize")
+    assert response.message == "Friday, June 26, 9:00 to 9:30 AM works."

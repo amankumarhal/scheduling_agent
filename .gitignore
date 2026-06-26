@@ -7,6 +7,7 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
+logs/
 .DS_Store
 *.mp3
 *.wav

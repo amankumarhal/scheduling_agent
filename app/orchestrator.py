@@ -10,7 +10,9 @@ from app.models import AgentResponse, ConversationState, ToolCallRecord
 from app.openai_client import OpenAIClient
 from app.prompts import EMERGENCY_RESPONSE, SYSTEM_PROMPT
 from app.scheduling_tools import SchedulingTools
+from app.session_logger import SessionLogger
 from app.store import InMemoryAppointmentStore
+from app.text_utils import normalize_for_voice
 
 
 EMERGENCY_PATTERNS = [
@@ -143,6 +145,7 @@ class AppointmentOrchestrator:
         self.tools = SchedulingTools(self.store)
         self.openai_client = openai_client or OpenAIClient()
         self.sessions: dict[str, ConversationState] = {}
+        self.session_logger = SessionLogger()
 
     def get_state(self, session_id: str) -> ConversationState:
         if session_id not in self.sessions:
@@ -153,14 +156,17 @@ class AppointmentOrchestrator:
         state = self.get_state(session_id)
 
         if state.emergency_active and not is_emergency_clarification(message):
+            self.session_logger.log(session_id, "user", {"message": message})
             return self._record_assistant_response(state, EMERGENCY_RESPONSE)
         if is_emergency(message) and not is_emergency_clarification(message):
             state.emergency_active = True
+            self.session_logger.log(session_id, "user", {"message": message})
             return self._record_assistant_response(state, EMERGENCY_RESPONSE)
         if state.emergency_active and is_emergency_clarification(message):
             state.emergency_active = False
 
         state.messages.append({"role": "user", "content": message})
+        self.session_logger.log(session_id, "user", {"message": message})
         llm_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + state.messages
 
         local_tool_calls: list[ToolCallRecord] = []
@@ -169,8 +175,9 @@ class AppointmentOrchestrator:
             assistant_message = self._extract_message(response)
             tool_calls = self._extract_tool_calls(assistant_message)
             if not tool_calls:
-                content = self._extract_content(assistant_message)
+                content = normalize_for_voice(self._extract_content(assistant_message))
                 state.messages.append({"role": "assistant", "content": content})
+                self.session_logger.log(session_id, "assistant", {"message": content})
                 return self._agent_response(state, content, local_tool_calls)
 
             llm_messages.append(self._assistant_tool_message_for_history(assistant_message))
@@ -183,7 +190,9 @@ class AppointmentOrchestrator:
                 state.messages.append(tool_message)
 
         fallback = "I’m sorry, I hit a tool loop while working on that. Could you restate what you want to do next?"
+        fallback = normalize_for_voice(fallback)
         state.messages.append({"role": "assistant", "content": fallback})
+        self.session_logger.log(session_id, "assistant", {"message": fallback})
         return self._agent_response(state, fallback, local_tool_calls)
 
     def _execute_tool_call(self, tool_call: Any, state: ConversationState) -> tuple[ToolCallRecord, dict[str, Any]]:
@@ -198,6 +207,11 @@ class AppointmentOrchestrator:
             output = self._dispatch_tool(name, arguments, state)
 
         record = ToolCallRecord(tool_name=name, arguments=arguments, output=output)
+        self.session_logger.log(
+            state.session_id,
+            "tool_call",
+            record.model_dump(mode="json"),
+        )
         tool_message = {
             "role": "tool",
             "tool_call_id": self._tool_call_id(tool_call),
@@ -264,7 +278,9 @@ class AppointmentOrchestrator:
         )
 
     def _record_assistant_response(self, state: ConversationState, content: str) -> AgentResponse:
+        content = normalize_for_voice(content)
         state.messages.append({"role": "assistant", "content": content})
+        self.session_logger.log(state.session_id, "assistant", {"message": content})
         return self._agent_response(state, content, [])
 
     def _state_summary(self, state: ConversationState) -> dict[str, Any]:
@@ -330,4 +346,3 @@ class AppointmentOrchestrator:
         if isinstance(tool_call, dict):
             return tool_call.get("id", "tool_call")
         return tool_call.id
-
