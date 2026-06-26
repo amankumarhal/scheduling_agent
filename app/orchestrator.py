@@ -86,8 +86,11 @@ def is_non_emergency_symptom_context(text: str) -> bool:
     """Detect symptom or minor-injury context that should route to scheduling, not advice."""
     lowered = text.lower()
     symptom_pattern = r"\b(injured|injury|broken|bone|pain|hurt|hurts)\b"
-    scheduling_pattern = r"\b(appointment|schedule|book|primary care|cardiology|dermatology|pediatrics|physical therapy|doctor)\b"
-    return bool(re.search(symptom_pattern, lowered)) and not bool(re.search(scheduling_pattern, lowered))
+    supported_routing_pattern = (
+        r"\b(primary care|cardiology|cardiologist|dermatology|dermatologist|pediatrics|"
+        r"pediatrician|physical therapy|physical therapist|provider|dr\.?|doctor)\b"
+    )
+    return bool(re.search(symptom_pattern, lowered)) and not bool(re.search(supported_routing_pattern, lowered))
 
 
 def _schema(

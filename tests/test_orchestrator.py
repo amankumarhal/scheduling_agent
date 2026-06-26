@@ -171,7 +171,7 @@ def test_non_emergency_injury_context_does_not_get_medical_advice() -> None:
     mock = MockOpenAIClient([assistant_response("This should not be called.")])
     agent = AppointmentOrchestrator(openai_client=mock)
     response = agent.handle_message(
-        "I just got injured on my right hand which is a broken bone.",
+        "I'll have to book an appointment because I got injured.",
         session_id="minor-injury-context",
     )
 
