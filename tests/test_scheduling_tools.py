@@ -1,3 +1,5 @@
+import json
+
 from app.models import PatientInfo
 from app.scheduling_tools import SchedulingTools
 from app.store import InMemoryAppointmentStore, JsonAppointmentStore
@@ -146,6 +148,29 @@ def test_search_bookings_by_phone_returns_scheduled_appointments() -> None:
     assert result.success is True
     assert len(result.bookings) == 1
     assert result.bookings[0].booking_id == booking.booking_id
+    assert len(result.appointment_details) == 1
+    assert result.appointment_details[0].booking_id == booking.booking_id
+    assert result.appointment_details[0].provider_name == "Dr. Elena Rivera"
+    assert result.appointment_details[0].specialty == "Cardiology"
+    assert result.appointment_details[0].location == "Heart Center"
+    assert result.appointment_details[0].appointment_time is not None
+    assert "slot_card_1" not in result.appointment_details[0].model_dump_json()
+
+
+def test_get_booking_returns_voice_friendly_appointment_detail() -> None:
+    tools = make_tools()
+    booking = tools.book_appointment("slot_pc_1", patient(), "Hand pain", True).booking
+    assert booking is not None
+
+    result = tools.get_booking(booking.booking_id)
+
+    assert result["success"] is True
+    assert result["appointment_detail"]["booking_id"] == booking.booking_id
+    assert result["appointment_detail"]["provider_name"] == "Dr. Maya Patel"
+    assert result["appointment_detail"]["specialty"] == "Primary care"
+    assert result["appointment_detail"]["location"] == "Downtown Clinic"
+    assert result["appointment_detail"]["appointment_time"] is not None
+    assert "slot_pc_1" not in result["appointment_detail"].__str__()
 
 
 def test_search_bookings_by_phone_ignores_canceled_by_default() -> None:
@@ -203,3 +228,30 @@ def test_json_store_persists_booking_across_instances(tmp_path) -> None:
     assert persisted_slot.is_booked is True
     assert len(persisted_lookup.bookings) == 1
     assert persisted_lookup.bookings[0].booking_id == booking.booking_id
+
+
+def test_json_store_migrates_legacy_booking_ids_to_digits(tmp_path) -> None:
+    first_store = JsonAppointmentStore(tmp_path)
+    first_store.bookings_path.write_text(
+        json.dumps(
+            [
+                {
+                    "booking_id": "bk_08358756",
+                    "slot_id": "slot_pc_1",
+                    "patient_info": {"patient_name": "Aman Kumar", "phone_number": "9193496712"},
+                    "appointment_reason": "hand pain",
+                    "status": "booked",
+                    "created_at": "2026-06-26T20:29:42.581210",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    migrated_store = JsonAppointmentStore(tmp_path)
+    migrated_booking = migrated_store.list_bookings()[0]
+    lookup = SchedulingTools(migrated_store).search_bookings_by_phone("9193496712")
+
+    assert migrated_booking.booking_id.isdigit()
+    assert lookup.appointment_details[0].booking_id.isdigit()
+    assert lookup.appointment_details[0].provider_name == "Dr. Maya Patel"

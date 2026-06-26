@@ -8,6 +8,10 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 
 
+def generate_booking_reference() -> str:
+    return str(uuid4().int)[:10]
+
+
 class BookingStatus(str, Enum):
     booked = "booked"
     canceled = "canceled"
@@ -40,7 +44,7 @@ class AppointmentSlot(BaseModel):
 
 
 class AppointmentBooking(BaseModel):
-    booking_id: str = Field(default_factory=lambda: str(uuid4().int)[:10])
+    booking_id: str = Field(default_factory=generate_booking_reference)
     slot_id: str
     patient_info: PatientInfo
     appointment_reason: str = Field(..., min_length=1)
@@ -89,10 +93,24 @@ class SearchBookingsByPhoneInput(BaseModel):
     include_canceled: bool = False
 
 
+class AppointmentDetail(BaseModel):
+    booking_id: str
+    patient_name: str
+    phone_number: str
+    appointment_reason: str
+    status: BookingStatus
+    provider_name: str | None = None
+    specialty: str | None = None
+    location: str | None = None
+    appointment_time: str | None = None
+    created_at: datetime
+
+
 class SearchBookingsByPhoneOutput(BaseModel):
     success: bool
     message: str
     bookings: list[AppointmentBooking] = Field(default_factory=list)
+    appointment_details: list[AppointmentDetail] = Field(default_factory=list)
 
 
 class HoldSlotInput(BaseModel):

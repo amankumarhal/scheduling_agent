@@ -6,7 +6,7 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.sample_data import create_sample_slots
-from app.models import AppointmentBooking, AppointmentSlot
+from app.models import AppointmentBooking, AppointmentSlot, generate_booking_reference
 
 
 class InMemoryAppointmentStore:
@@ -70,7 +70,13 @@ class JsonAppointmentStore(InMemoryAppointmentStore):
             return {}
         with self.bookings_path.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
-        return {item["booking_id"]: AppointmentBooking.model_validate(item) for item in data}
+        bookings: dict[str, AppointmentBooking] = {}
+        for item in data:
+            booking = AppointmentBooking.model_validate(item)
+            while not booking.booking_id.isdigit() or booking.booking_id in bookings:
+                booking.booking_id = generate_booking_reference()
+            bookings[booking.booking_id] = booking
+        return bookings
 
     def _persist(self) -> None:
         self._write_json(

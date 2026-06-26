@@ -122,4 +122,6 @@ def test_orchestrator_can_lookup_existing_booking_by_phone() -> None:
 
     assert response.tool_calls[0].tool_name == "search_bookings_by_phone"
     assert response.tool_calls[0].output["bookings"][0]["booking_id"] == booking.booking_id
+    assert response.tool_calls[0].output["appointment_details"][0]["provider_name"] == "Dr. Elena Rivera"
+    assert response.tool_calls[0].output["appointment_details"][0]["location"] == "Heart Center"
     assert booking.booking_id in response.message

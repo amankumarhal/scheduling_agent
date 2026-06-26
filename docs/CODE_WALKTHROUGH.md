@@ -138,6 +138,8 @@ Main tools:
 
 The scheduling tools protect the system from unsafe model behavior. The LLM can request a tool call, but the tool decides whether the action is valid.
 
+Existing appointment lookups also return `appointment_details`, a user-facing view that joins booking data with provider, specialty, location, and appointment time. This keeps internal slot IDs out of spoken responses.
+
 ### `app/prompts.py`
 
 This module contains the system prompt and emergency response.

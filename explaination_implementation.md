@@ -10,6 +10,8 @@ The goal is to keep the system fast, explainable, and easy to operate locally. O
 
 Booking reference numbers use digits only so they are easier to hear and repeat in a voice conversation.
 
+Existing appointment lookup returns a user-facing appointment detail object that includes provider, specialty, location, and appointment time. Internal slot IDs stay in the backend and should not be read aloud.
+
 ## Latency Choices
 
 Urgency detection runs before the LLM using regex patterns. This keeps urgent routing fast because the system does not wait for a model call before telling the user to call 911.

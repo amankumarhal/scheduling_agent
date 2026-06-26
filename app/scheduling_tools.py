@@ -8,6 +8,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.sample_data import SPECIALTIES
 from app.models import (
+    AppointmentDetail,
     AppointmentBooking,
     AppointmentSlot,
     BookAppointmentInput,
@@ -73,6 +74,14 @@ def _date_matches(slot: AppointmentSlot, preferred_date: str | None) -> bool:
     return text in iso_date or text in weekday or iso_date in text or weekday in text
 
 
+def _format_appointment_time(slot: AppointmentSlot | None) -> str | None:
+    if not slot:
+        return None
+    start = slot.start_time.strftime("%A, %B %-d, %Y at %-I:%M %p")
+    end = slot.end_time.strftime("%-I:%M %p")
+    return f"{start} to {end}"
+
+
 def _error_output(output_model: type[BaseModel], message: str) -> BaseModel:
     return output_model(success=False, message=message)
 
@@ -83,6 +92,21 @@ class SchedulingTools:
 
     def list_specialties(self) -> dict[str, Any]:
         return {"success": True, "message": "Available specialties returned.", "specialties": SPECIALTIES}
+
+    def _appointment_detail(self, booking: AppointmentBooking) -> AppointmentDetail:
+        slot = self.store.get_slot(booking.slot_id)
+        return AppointmentDetail(
+            booking_id=booking.booking_id,
+            patient_name=booking.patient_info.patient_name,
+            phone_number=booking.patient_info.phone_number,
+            appointment_reason=booking.appointment_reason,
+            status=booking.status,
+            provider_name=slot.provider_name if slot else None,
+            specialty=slot.specialty if slot else None,
+            location=slot.location if slot else None,
+            appointment_time=_format_appointment_time(slot),
+            created_at=booking.created_at,
+        )
 
     def search_available_slots(
         self,
@@ -254,8 +278,13 @@ class SchedulingTools:
     def get_booking(self, booking_id: str) -> dict[str, Any]:
         booking = self.store.get_booking(booking_id)
         if not booking:
-            return {"success": False, "message": "Booking not found.", "booking": None}
-        return {"success": True, "message": "Booking found.", "booking": booking.model_dump(mode="json")}
+            return {"success": False, "message": "Booking not found.", "booking": None, "appointment_detail": None}
+        return {
+            "success": True,
+            "message": "Booking found. Use appointment_detail for the user-facing response and do not mention internal slot IDs.",
+            "booking": booking.model_dump(mode="json"),
+            "appointment_detail": self._appointment_detail(booking).model_dump(mode="json"),
+        }
 
     def search_bookings_by_phone(
         self,
@@ -291,12 +320,17 @@ class SchedulingTools:
                 success=True,
                 message="No scheduled appointments were found for that phone number.",
                 bookings=[],
+                appointment_details=[],
             )
 
         return SearchBookingsByPhoneOutput(
             success=True,
-            message=f"Found {len(matches)} appointment(s) for that phone number.",
+            message=(
+                f"Found {len(matches)} appointment(s) for that phone number. "
+                "Use appointment_details for the user-facing response and do not mention internal slot IDs."
+            ),
             bookings=matches,
+            appointment_details=[self._appointment_detail(booking) for booking in matches],
         )
 
     def cancel_appointment(
