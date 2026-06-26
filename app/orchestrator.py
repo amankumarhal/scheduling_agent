@@ -27,7 +27,7 @@ EMERGENCY_PATTERNS = [
     r"\b(suicidal|suicide|kill myself|self harm)\b",
     r"\b(excruciating pain|unbearable pain|worst pain)\b",
     r"\b(had a fall|took a fall|bad fall|serious fall|fell|fallen)\b",
-    r"\b(injury|injured|serious injury|head injury)\b",
+    r"\b(serious injury|head injury|hit my head)\b",
     r"\b(accident|car crash|crash|collision)\b",
 ]
 
@@ -48,14 +48,26 @@ def is_emergency_clarification(text: str) -> bool:
         "made a mistake",
         "i am okay",
         "i'm okay",
+        "i am all right",
+        "i'm all right",
+        "i am alright",
+        "i'm alright",
+        "all right",
+        "alright",
         "i am fine",
         "i'm fine",
+        "just kidding",
+        "was kidding",
+        "minimal pain",
+        "minor pain",
+        "not severe",
+        "not that much",
     ]
     negated_urgent_pattern = (
         r"\b("
         r"did not|didn't|do not|don't|not|no longer|never"
         r")\b.{0,40}\b("
-        r"injured|injury|hurt|fallen|fell|fall|chest pain|stroke|bleeding|suicidal"
+        r"injured|injury|hurt|broken|bone|pain|fallen|fell|fall|chest pain|stroke|bleeding|suicidal"
         r")\b"
     )
     return any(phrase in lowered for phrase in clarification_phrases) or bool(

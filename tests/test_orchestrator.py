@@ -110,7 +110,7 @@ def test_emergency_response_does_not_continue_scheduling() -> None:
 def test_emergency_clarification_allows_scheduling_to_resume() -> None:
     mock = MockOpenAIClient([assistant_response("I can help with primary care. Do you have a preferred day?")])
     agent = AppointmentOrchestrator(openai_client=mock)
-    first = agent.handle_message("I just got injured.", session_id="emergency-clarify")
+    first = agent.handle_message("I just fell from my bed.", session_id="emergency-clarify")
     second = agent.handle_message(
         "Sorry, I made a mistake. I did not get injured. I just need an appointment for primary care.",
         session_id="emergency-clarify",
@@ -118,6 +118,36 @@ def test_emergency_clarification_allows_scheduling_to_resume() -> None:
 
     assert first.message == EMERGENCY_RESPONSE
     assert second.message == "I can help with primary care. Do you have a preferred day?"
+    assert second.state_summary["emergency_active"] is False
+    assert mock.calls == 1
+
+
+def test_minor_injury_clarification_resumes_scheduling() -> None:
+    mock = MockOpenAIClient([assistant_response("I can help with primary care. What day works best?")])
+    agent = AppointmentOrchestrator(openai_client=mock)
+    first = agent.handle_message("I just fell from my bed.", session_id="minor-injury")
+    second = agent.handle_message(
+        "No, but it's not that much broken. It is small. It is very minimal pain. So I can just go with a primary care doctor.",
+        session_id="minor-injury",
+    )
+
+    assert first.message == EMERGENCY_RESPONSE
+    assert second.message == "I can help with primary care. What day works best?"
+    assert second.state_summary["emergency_active"] is False
+    assert mock.calls == 1
+
+
+def test_just_kidding_clarification_resumes_scheduling() -> None:
+    mock = MockOpenAIClient([assistant_response("I can help schedule primary care. Do you have a preferred time?")])
+    agent = AppointmentOrchestrator(openai_client=mock)
+    first = agent.handle_message("I just fell from my bed.", session_id="just-kidding")
+    second = agent.handle_message(
+        "I was just kidding. Can you please help me get an appointment for primary care?",
+        session_id="just-kidding",
+    )
+
+    assert first.message == EMERGENCY_RESPONSE
+    assert second.message == "I can help schedule primary care. Do you have a preferred time?"
     assert second.state_summary["emergency_active"] is False
     assert mock.calls == 1
 

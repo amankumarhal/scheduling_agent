@@ -56,7 +56,7 @@ EMERGENCY_PATTERNS = [
     r"\b(suicidal|suicide|kill myself|self harm)\b",
     r"\b(excruciating pain|unbearable pain|worst pain)\b",
     r"\b(had a fall|took a fall|bad fall|serious fall|fell|fallen)\b",
-    r"\b(injury|injured|serious injury|head injury|hit my head)\b",
+    r"\b(serious injury|head injury|hit my head)\b",
     r"\b(accident|car accident|car crash|crash|collision)\b",
 ]
 

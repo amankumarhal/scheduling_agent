@@ -360,6 +360,8 @@ There are two emergency checks on purpose:
 - The intent classifier marks obvious urgent messages as `emergency`.
 - The orchestrator also runs `is_emergency()` directly as a safety backstop before calling the LLM.
 
+Emergency mode is intentionally reversible when the user clearly corrects the situation, such as saying they are all right, it was a mistake, it was a false alarm, they were kidding, or the pain/injury is minor and they want routine scheduling. This avoids trapping a corrected conversation in the emergency state.
+
 ## Provider and Specialty Matching
 
 The system handles common ways users ask for appointments:
