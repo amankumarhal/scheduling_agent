@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 from typing import Any
 
@@ -69,9 +69,15 @@ def _date_matches(slot: AppointmentSlot, preferred_date: str | None) -> bool:
     if not preferred_date:
         return True
     text = preferred_date.strip().lower()
+    today = datetime.now().date()
+    if "today" in text:
+        return slot.start_time.date() == today
+    if "tomorrow" in text:
+        return slot.start_time.date() == today + timedelta(days=1)
     iso_date = slot.start_time.date().isoformat()
     weekday = slot.start_time.strftime("%A").lower()
-    return text in iso_date or text in weekday or iso_date in text or weekday in text
+    normalized_text = text.replace("next ", "")
+    return normalized_text in iso_date or normalized_text in weekday or iso_date in text or weekday in normalized_text
 
 
 def _format_appointment_time(slot: AppointmentSlot | None) -> str | None:
@@ -108,6 +114,20 @@ class SchedulingTools:
             created_at=booking.created_at,
         )
 
+    def _available_slots_for_scope(self, specialty: str | None = None, provider_name: str | None = None) -> list[AppointmentSlot]:
+        specialty_norm = _normalize(specialty)
+        provider_norm = _normalize(provider_name)
+        slots = []
+        for slot in self.store.list_slots():
+            if not slot.is_available or slot.is_booked:
+                continue
+            if specialty_norm and _normalize(slot.specialty) != specialty_norm:
+                continue
+            if provider_norm and provider_norm not in _normalize(slot.provider_name):
+                continue
+            slots.append(slot)
+        return sorted(slots, key=lambda item: item.start_time)
+
     def search_available_slots(
         self,
         specialty: str,
@@ -142,9 +162,21 @@ class SchedulingTools:
             matches.append(slot)
 
         if not matches:
+            alternatives = []
+            if data.preferred_date or data.preferred_time_window:
+                alternatives = self._available_slots_for_scope(data.specialty, data.provider_name)[:3]
+            if alternatives:
+                return SearchSlotsOutput(
+                    success=True,
+                    message=(
+                        "No slots match the requested date or time. "
+                        "List these soonest available alternatives in the same response and ask whether one works."
+                    ),
+                    slots=alternatives,
+                )
             return SearchSlotsOutput(
                 success=True,
-                message="No matching available slots were found. Offer alternatives or ask for a broader time.",
+                message="No matching available slots were found. Ask one follow-up question for a broader date or time.",
                 slots=[],
             )
         return SearchSlotsOutput(success=True, message=f"Found {len(matches)} available slot(s).", slots=matches)
@@ -204,6 +236,18 @@ class SchedulingTools:
             slots.append(slot)
 
         if not slots:
+            alternatives = []
+            if data.preferred_date or data.preferred_time_window:
+                alternatives = self._available_slots_for_scope(provider_name=best_provider)[:3]
+            if alternatives:
+                return SearchSlotsOutput(
+                    success=True,
+                    message=(
+                        f"Provider {best_provider} was found, but no slots match the requested date or time. "
+                        "List these soonest available alternatives in the same response and ask whether one works."
+                    ),
+                    slots=alternatives,
+                )
             return SearchSlotsOutput(
                 success=True,
                 message=f"Provider {best_provider} was found, but no matching available slots were found. Offer another time or specialty.",

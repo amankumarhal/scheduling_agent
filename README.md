@@ -208,7 +208,7 @@ Scenario 3: No availability
 
 User asks for a specific provider/time with no slots.
 
-Expected behavior: the agent says that slot is unavailable and offers alternatives or asks for a broader time.
+Expected behavior: the agent says that slot is unavailable and immediately offers the soonest alternatives when any are available.
 
 Scenario 4: Reschedule
 

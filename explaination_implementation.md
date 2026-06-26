@@ -20,6 +20,8 @@ The urgent pattern list includes high-signal phrases such as chest pain, trouble
 
 Speech output uses OpenAI's configurable TTS speed setting. The default is `1.25`, which makes the assistant speak faster while keeping responses understandable.
 
+Slot search understands simple relative dates like today and tomorrow. If a preferred date or time has no exact match, the tool returns the soonest alternatives in the same result so the assistant can offer them immediately.
+
 ## User Information
 
 Booking requires only patient name, phone number, appointment reason, selected slot, and explicit confirmation. Date of birth is intentionally not collected in this version.

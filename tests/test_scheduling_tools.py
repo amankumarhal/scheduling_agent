@@ -40,6 +40,32 @@ def test_search_filters_by_provider_if_provided() -> None:
     assert all("Rivera" in slot.provider_name for slot in result.slots)
 
 
+def test_search_understands_tomorrow() -> None:
+    tools = make_tools()
+    result = tools.search_available_slots("Primary care", preferred_date="tomorrow")
+    assert result.success is True
+    assert result.slots
+    assert result.slots[0].provider_name == "Dr. Maya Patel"
+
+
+def test_search_returns_alternatives_when_preferred_time_has_no_match() -> None:
+    tools = make_tools()
+    result = tools.search_available_slots("Primary care", preferred_time_window="evening")
+    assert result.success is True
+    assert result.slots
+    assert "soonest available alternatives" in result.message
+    assert all(slot.specialty == "Primary care" for slot in result.slots)
+
+
+def test_provider_search_returns_alternatives_when_preferred_time_has_no_match() -> None:
+    tools = make_tools()
+    result = tools.search_provider_slots("Maya Patel", preferred_time_window="evening")
+    assert result.success is True
+    assert result.slots
+    assert "soonest available alternatives" in result.message
+    assert all(slot.provider_name == "Dr. Maya Patel" for slot in result.slots)
+
+
 def test_booking_requires_explicit_confirmation() -> None:
     tools = make_tools()
     result = tools.book_appointment("slot_card_1", patient(), "Follow-up", False)
