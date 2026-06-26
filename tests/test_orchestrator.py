@@ -107,6 +107,21 @@ def test_emergency_response_does_not_continue_scheduling() -> None:
     assert mock.calls == 0
 
 
+def test_emergency_clarification_allows_scheduling_to_resume() -> None:
+    mock = MockOpenAIClient([assistant_response("I can help with primary care. Do you have a preferred day?")])
+    agent = AppointmentOrchestrator(openai_client=mock)
+    first = agent.handle_message("I just got injured.", session_id="emergency-clarify")
+    second = agent.handle_message(
+        "Sorry, I made a mistake. I did not get injured. I just need an appointment for primary care.",
+        session_id="emergency-clarify",
+    )
+
+    assert first.message == EMERGENCY_RESPONSE
+    assert second.message == "I can help with primary care. Do you have a preferred day?"
+    assert second.state_summary["emergency_active"] is False
+    assert mock.calls == 1
+
+
 def test_orchestrator_normalizes_tts_unfriendly_output() -> None:
     mock = MockOpenAIClient([assistant_response("Fri, Jun 26 \u2014 9:00\u20139:30 AM works.")])
     agent = AppointmentOrchestrator(openai_client=mock)

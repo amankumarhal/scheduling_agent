@@ -41,7 +41,26 @@ def is_emergency(text: str) -> bool:
 def is_emergency_clarification(text: str) -> bool:
     """Detect when the user clarifies that a prior urgent phrase was not an emergency."""
     lowered = text.lower()
-    return any(phrase in lowered for phrase in ["not an emergency", "not emergency", "false alarm"])
+    clarification_phrases = [
+        "not an emergency",
+        "not emergency",
+        "false alarm",
+        "made a mistake",
+        "i am okay",
+        "i'm okay",
+        "i am fine",
+        "i'm fine",
+    ]
+    negated_urgent_pattern = (
+        r"\b("
+        r"did not|didn't|do not|don't|not|no longer|never"
+        r")\b.{0,40}\b("
+        r"injured|injury|hurt|fallen|fell|fall|chest pain|stroke|bleeding|suicidal"
+        r")\b"
+    )
+    return any(phrase in lowered for phrase in clarification_phrases) or bool(
+        re.search(negated_urgent_pattern, lowered)
+    )
 
 
 def _schema(
